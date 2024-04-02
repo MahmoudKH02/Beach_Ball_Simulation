@@ -114,15 +114,14 @@ int main() {
         write(fd[i][1], buffer, sizeof(buffer));
 
         sleep(1);
-
-        memset(buffer, 0x0, BUFFER_SIZE);
-
-        read(fd[i][0], buffer, BUFFER_SIZE); // Read from pipe
-        printf("Parent received message from child %d: %s\n", i+1, buffer);
+        printf("Child %d pid=%d\n", i, pids[i]);
+        fflush(NULL);
 
         close(fd[i][0]); // Close read end
         close(fd[i][1]); // Close write end
-        
+    }
+
+    for ( i = 0; i < NUM_CHILDREN; i++ ) {
         wait(NULL);
     }
 

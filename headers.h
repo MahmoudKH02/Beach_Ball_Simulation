@@ -14,6 +14,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <signal.h>
+#include <time.h>
+#include <math.h>
 
 #endif
 
