@@ -2,21 +2,27 @@
 #ifndef __HEADER__
 #define __HEADER__
 
-#define BUFFER_SIZE 512
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
-#include <aio.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdbool.h>
 #include <signal.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #include <time.h>
-#include <math.h>
+#include <sys/sem.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include<sys/shm.h>
+#include <errno.h>
+// #include <GL/glut.h>
+
+#include "constants.h"
 
 #endif
 

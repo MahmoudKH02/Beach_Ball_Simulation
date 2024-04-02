@@ -1,10 +1,12 @@
 #include "headers.h"
 
-#define NUM_CHILDREN 12
+pid_t pids[NUM_CHILDREN];
+
+void send_ball_teamA(int);
+void send_ball_teamB(int);
 
 int main() {
 	int fd[NUM_CHILDREN][2];
-	pid_t pids[NUM_CHILDREN];
 	int i;
 
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
@@ -79,9 +81,32 @@ int main() {
         close(fd[i][1]); // Close write end
     }
 
+    // send ball to team leads
+    kill(pids[TEAM_A], SIGUSR2);
+    kill(pids[TEAM_B], SIGUSR2);
+
+    if ( sigset(SIGUSR1, send_ball_teamA) == SIG_ERR ) {
+        perror("Sigset can not set SIGQUIT");
+        exit(SIGQUIT);
+    }
+
+    if ( sigset(SIGUSR2, send_ball_teamB) == SIG_ERR ) {
+        perror("Sigset can not set SIGQUIT");
+        exit(SIGQUIT);
+    }
+
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         wait(NULL);
     }
 
     return 0;
+}
+
+
+void send_ball_teamA(int sig) {
+    kill(pids[TEAM_A], SIGUSR2);
+}
+
+void send_ball_teamB(int sig) {
+    kill(pids[TEAM_B], SIGUSR2);
 }

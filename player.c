@@ -2,29 +2,31 @@
 
 pid_t fetch_next_pid (int, int*);
 unsigned int get_sleep_duration();
-void initialize(int);
+void initialize();
 
+void catch_ball_from_player(int);
+void catch_ball_from_teamlead (int sig);
 
-int energy = 100;
+int energy;
+int fd_pipe[2];
 pid_t next_pid;
 pid_t other_team_lead;
 int player_num;
+int num_balls_team;
 
 
 int main(int argc, char *argv[]) {
-
-    void catch_ball_player(int);
-    void catch_ball_teamlead (int sig);
-
     if (argc < 4) {
         perror("Not enough arguments\n");
         exit(-1);
     }
 
-    int pipe[2] = {atoi(argv[1]), atoi(argv[2])};
+    fd_pipe[0] = atoi(argv[1]);
+    fd_pipe[1] = atoi(argv[2]);
+    
     player_num = atoi(argv[3]);
 
-    initialize(pipe[0]);
+    initialize();
 
     while (1) {
         // printf("energy: %d\t", energy);
@@ -33,26 +35,26 @@ int main(int argc, char *argv[]) {
         pause();
     }
 
-    // close(pipe[0]);
-    // close(pipe[1]); // Close write end
+    // close(fd_pipe[0]);
+    // close(fd_pipe[1]); // Close write end
 
     return 0;
 }
 
 
-void initialize(int r_pipe) {
+void initialize() {
     if (player_num == 6 || player_num == 0) {
-        next_pid = fetch_next_pid(r_pipe, &other_team_lead);
+        next_pid = fetch_next_pid(fd_pipe[0], &other_team_lead);
 
-        if ( sigset(SIGUSR2, catch_ball_teamlead) == SIG_ERR ) {
+        if ( sigset(SIGUSR2, catch_ball_from_teamlead) == SIG_ERR ) {
             perror("Sigset can not set SIGQUIT");
             exit(SIGQUIT);
         }
     }
     else
-        next_pid = fetch_next_pid(r_pipe, NULL);
+        next_pid = fetch_next_pid(fd_pipe[0], NULL);
 
-    if ( sigset(SIGUSR1, catch_ball_player) == SIG_ERR ) {
+    if ( sigset(SIGUSR1, catch_ball_from_player) == SIG_ERR ) {
         perror("Sigset can not set SIGQUIT");
         exit(SIGQUIT);
     }
@@ -63,10 +65,10 @@ void initialize(int r_pipe) {
 }
 
 
-pid_t fetch_next_pid(int r_pipe, int* other_team_lead) {
+pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead) {
     char message[512];
 
-    read(r_pipe, message, sizeof(message));
+    read(r_fd_pipe, message, sizeof(message));
 
     if (other_team_lead) {
         char* temp = strtok(message, ",");
@@ -82,7 +84,7 @@ pid_t fetch_next_pid(int r_pipe, int* other_team_lead) {
 }
 
 
-void catch_ball_player(int sig) {
+void catch_ball_from_player(int sig) {
     // unsigned int duration = get_sleep_duration();
     sleep(1);
 
@@ -101,20 +103,65 @@ void catch_ball_player(int sig) {
 
     if (player_num == 0 || player_num == 6) {
         kill(other_team_lead, SIGUSR2);
-        printf("team lead (%d) passing ball to: %d\n", player_num, other_team_lead);
+        num_balls_team -= 1;
+
+        printf(
+            "team lead (%d) passing ball to: (%d) %d--Balls=%d\n",
+            player_num, (player_num==6)? 0:6, other_team_lead, num_balls_team
+        );
         fflush(NULL);
+
+        if (num_balls_team == 0) {
+            if (player_num == 0)
+                kill(getppid(), SIGUSR1);
+            else if (player_num == 6)
+                kill(getppid(), SIGUSR2);
+        }
+        
     } else {
         // signal next child
         kill(next_pid, SIGUSR1);
-        printf("player (%d) passing ball to: %d\n", player_num, next_pid);
+
+        if (player_num == 5)
+            printf("player (%d) passing ball to (0), pid:%d\n", player_num, next_pid);
+        else if (player_num == 11)
+            printf("player (%d) passing ball to (6), pid:%d\n", player_num, next_pid);
+        else
+            printf("player (%d) passing ball to (%d), pid:%d\n", player_num, player_num+1, next_pid);
+
         fflush(NULL);
     }
 }
 
 
-void catch_ball_teamlead(int sig) {
+void catch_ball_from_teamlead(int sig) {
     // unsigned int duration = get_sleep_duration();
-    sleep(1);
+
+    if (num_balls_team == 0) {
+        num_balls_team += 1;
+        sleep(1);
+
+
+        printf(
+            "Parent passing ball to (%d), pid:%d--Balls=%d\n",
+            player_num, getpid(), num_balls_team
+        );
+        
+        kill(next_pid, SIGUSR1);
+
+    } else {
+        num_balls_team += 1;
+        sleep(1);
+        
+        
+        printf(
+            "teamlead (%d) passing ball to (%d), pid:%d--Balls=%d\n",
+            player_num, player_num+1, next_pid, num_balls_team
+        );
+
+        kill(next_pid, SIGUSR1);
+    }
+
 
     // sighold(SIGUSR1);
     // sighold(SIGUSR2);
@@ -122,12 +169,9 @@ void catch_ball_teamlead(int sig) {
     // if (energy > 10)
     //     energy--;
     
-    kill(next_pid, SIGUSR1);
-    printf("team lead (%d) passing ball to: %d\n", player_num, next_pid);
     fflush(NULL);
     // sigrelse(SIGUSR1);
     // sigrelse(SIGUSR2);
-
 }
 
 
