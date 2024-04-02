@@ -2,6 +2,7 @@
 
 pid_t fetch_next_pid (int, int*);
 unsigned int get_sleep_duration();
+void initialize(int);
 
 
 int energy = 100;
@@ -23,37 +24,42 @@ int main(int argc, char *argv[]) {
     int pipe[2] = {atoi(argv[1]), atoi(argv[2])};
     player_num = atoi(argv[3]);
 
+    initialize(pipe[0]);
+
+    while (1) {
+        // printf("energy: %d\t", energy);
+        // fflush(NULL);
+        // decreament energy.
+        pause();
+    }
+
+    // close(pipe[0]);
+    // close(pipe[1]); // Close write end
+
+    return 0;
+}
+
+
+void initialize(int r_pipe) {
     if (player_num == 6 || player_num == 0) {
-        next_pid = fetch_next_pid(pipe[0], &other_team_lead);
+        next_pid = fetch_next_pid(r_pipe, &other_team_lead);
+
         if ( sigset(SIGUSR2, catch_ball_teamlead) == SIG_ERR ) {
             perror("Sigset can not set SIGQUIT");
             exit(SIGQUIT);
         }
     }
     else
-        next_pid = fetch_next_pid(pipe[0], NULL);
+        next_pid = fetch_next_pid(r_pipe, NULL);
 
     if ( sigset(SIGUSR1, catch_ball_player) == SIG_ERR ) {
         perror("Sigset can not set SIGQUIT");
         exit(SIGQUIT);
     }
 
-    while (1) {
-        // printf("energy: %d\t", energy);
-        // fflush(NULL);
-        pause();
-    }
-
-    // close(pipe[0]);
-
-    // char message[BUFFER_SIZE];
-    // memset(message, 0x0, BUFFER_SIZE);
-
-    // sprintf(message, "Iam Child %d pid(%d) --> next(%d) | otherTeam(%d)\n", player_num, getpid(), next_pid, other_team_lead);
-    // write(pipe[1], message, strlen(message)); // Write to pipe
-    // close(pipe[1]); // Close write end
-
-    return 0;
+    // initialize energy
+    srand(getpid());
+    energy = (rand() % 51) + 50; // 50 - 100
 }
 
 
@@ -77,8 +83,8 @@ pid_t fetch_next_pid(int r_pipe, int* other_team_lead) {
 
 
 void catch_ball_player(int sig) {
-    unsigned int duration = get_sleep_duration();
-    sleep(duration);
+    // unsigned int duration = get_sleep_duration();
+    sleep(1);
 
     // critical section
     // block signals
@@ -107,8 +113,8 @@ void catch_ball_player(int sig) {
 
 
 void catch_ball_teamlead(int sig) {
-    unsigned int duration = get_sleep_duration();
-    sleep(duration);
+    // unsigned int duration = get_sleep_duration();
+    sleep(1);
 
     // sighold(SIGUSR1);
     // sighold(SIGUSR2);
@@ -116,17 +122,17 @@ void catch_ball_teamlead(int sig) {
     // if (energy > 10)
     //     energy--;
     
-    // sigrelse(SIGUSR1);
-    // sigrelse(SIGUSR2);
-
     kill(next_pid, SIGUSR1);
     printf("team lead (%d) passing ball to: %d\n", player_num, next_pid);
     fflush(NULL);
+    // sigrelse(SIGUSR1);
+    // sigrelse(SIGUSR2);
+
 }
 
 
 unsigned int get_sleep_duration() {
-    //srand(time(NULL));
+    srand(time(NULL));
 
     int random = (rand() % 10) + 1;
     float duration = (float) ((100 + random) / energy);

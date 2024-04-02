@@ -1,42 +1,11 @@
 #include "headers.h"
 
 #define NUM_CHILDREN 12
-#define NUM_FIFOS 13
-#define FIFO_PATH "/tmp/fifo"
-
 
 int main() {
 	int fd[NUM_CHILDREN][2];
-	char fifos[NUM_CHILDREN + 1][100]; // 13
 	pid_t pids[NUM_CHILDREN];
 	int i;
-
-	// create the fifo pipes's names
-	for (i = 0; i < NUM_FIFOS; i++) {
-		strcpy(fifos[i], FIFO_PATH);
-		char player_num[20];
-
-		if (i < 6) {
-			strcat(fifos[i], "A");
-			sprintf(player_num, "%d", i);
-		} else {
-			strcat(fifos[i], "B");
-			sprintf(player_num, "%d", i-6);
-        }
-        strcat(fifos[i], player_num);
-
-        // creating teh fifo
-        mkfifo(fifos[i], 0666);
-	}
-
-    // add the last fifo pipe (between the two team leads)
-    strcpy(fifos[NUM_FIFOS-1], FIFO_PATH);
-    strcat(fifos[NUM_FIFOS-1], "AB");
-
-    for (i = 0; i < NUM_FIFOS; i++)
-        printf("%s ", fifos[i]);
-
-    printf("\n");
 
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         if ( pipe(fd[i]) < 0 ) {
@@ -63,24 +32,12 @@ int main() {
             sprintf(pipe_r, "%d", fd[i][0]);
             sprintf(pipe_w, "%d", fd[i][1]);
             sprintf(player_i, "%d", i);
-
-            if (i != 0 && i != 6) { // not the team leads
-                execlp(
-                    "./player", "player",
-                    pipe_r, pipe_w, player_i,
-                    fifos[i-1], fifos[i],
-                    NULL
-                );
-            } else { // team leads
-                int prev_player = (i == 0)? 5:11;
-
-                execlp(
-                    "./player", "player",
-                    pipe_r, pipe_w, player_i,
-                    fifos[prev_player], fifos[i], fifos[NUM_FIFOS-1],
-                    NULL
-                );
-            }
+            
+            execlp(
+                "./player", "player",
+                pipe_r, pipe_w, player_i,
+                NULL
+            );
         }
     }
 
@@ -114,6 +71,7 @@ int main() {
         write(fd[i][1], buffer, sizeof(buffer));
 
         sleep(1);
+
         printf("Child %d pid=%d\n", i, pids[i]);
         fflush(NULL);
 
@@ -124,10 +82,6 @@ int main() {
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         wait(NULL);
     }
-
-    // remove the fifos
-    for (i = 0; i < NUM_CHILDREN+1; i++)
-        unlink(fifos[i]);
 
     return 0;
 }
