@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
 
     close(pipe[0]);
 
-    char message[BUFFER_SIZE];
-    memset(message, 0x0, BUFFER_SIZE);
+    char message[MSG_SIZE];
+    memset(message, 0x0, MSG_SIZE);
 
     sprintf(message, "Iam (%d) --> (%d) | (%d)\n", player_num, getpid(), next_pid, other_team_lead);
     write(pipe[1], message, strlen(message)); // Write to pipe

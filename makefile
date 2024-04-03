@@ -1,6 +1,6 @@
 G = gcc -g
 O = -o
-names = main
+names = main player
 
 files:
 	$(G) main.c $(O) main

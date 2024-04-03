@@ -2,6 +2,7 @@
 #ifndef __HEADER__
 #define __HEADER__
 
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@
 #include <pthread.h>
 #include<sys/shm.h>
 #include <errno.h>
+#include <stdbool.h>
 // #include <GL/glut.h>
 
 #include "constants.h"

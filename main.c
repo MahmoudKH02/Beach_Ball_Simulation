@@ -1,13 +1,18 @@
 #include "headers.h"
 
-pid_t pids[NUM_CHILDREN];
-
 void send_ball_teamA(int);
 void send_ball_teamB(int);
+void end_start_new_round(int);
 
-int main() {
+
+pid_t pids[NUM_CHILDREN];
+int number_of_rounds = 0;
+
+int main(int argc, char *argv[]) {
 	int fd[NUM_CHILDREN][2];
 	int i;
+
+    signal(SIGALRM, end_start_new_round);
 
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         if ( pipe(fd[i]) < 0 ) {
@@ -46,24 +51,24 @@ int main() {
     // Parent process
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         // write required pid for child
-        char buffer[BUFFER_SIZE];
-        memset(buffer, 0x0, BUFFER_SIZE);
+        char buffer[MSG_SIZE];
+        memset(buffer, 0x0, MSG_SIZE);
 
         switch (i) {
-        case 0:
+        case LEAD_A:
             sprintf(buffer, "%d,%d", pids[i+1], pids[6]);
             break;
 
-        case 6:
+        case LEAD_B:
             sprintf(buffer, "%d,%d", pids[i+1], pids[0]);
             break;
 
-        case 5:
-            sprintf(buffer, "%d", pids[0]);
+        case LAST_A:
+            sprintf(buffer, "%d", pids[LEAD_A]);
             break;
 
-        case 11:
-            sprintf(buffer, "%d", pids[6]);
+        case LAST_B:
+            sprintf(buffer, "%d", pids[LEAD_B]);
             break;
 
         default:
@@ -72,8 +77,6 @@ int main() {
 
         write(fd[i][1], buffer, sizeof(buffer));
 
-        sleep(1);
-
         printf("Child %d pid=%d\n", i, pids[i]);
         fflush(NULL);
 
@@ -81,19 +84,22 @@ int main() {
         close(fd[i][1]); // Close write end
     }
 
+    sleep(1);
     // send ball to team leads
-    kill(pids[TEAM_A], SIGUSR2);
-    kill(pids[TEAM_B], SIGUSR2);
+    kill(pids[LEAD_A], SIGUSR2);
+    kill(pids[LEAD_B], SIGUSR2);
+    alarm(50); // 5 minutes
 
-    if ( sigset(SIGUSR1, send_ball_teamA) == SIG_ERR ) {
+    if ( signal(SIGUSR1, send_ball_teamA) == SIG_ERR ) {
         perror("Sigset can not set SIGQUIT");
         exit(SIGQUIT);
     }
 
-    if ( sigset(SIGUSR2, send_ball_teamB) == SIG_ERR ) {
+    if ( signal(SIGUSR2, send_ball_teamB) == SIG_ERR ) {
         perror("Sigset can not set SIGQUIT");
         exit(SIGQUIT);
     }
+
 
     for ( i = 0; i < NUM_CHILDREN; i++ ) {
         wait(NULL);
@@ -102,11 +108,16 @@ int main() {
     return 0;
 }
 
-
 void send_ball_teamA(int sig) {
-    kill(pids[TEAM_A], SIGUSR2);
+    kill(pids[LEAD_A], SIGUSR2);
 }
 
 void send_ball_teamB(int sig) {
-    kill(pids[TEAM_B], SIGUSR2);
+    kill(pids[LEAD_B], SIGUSR2);
+}
+
+void end_start_new_round(int signum){
+    for (int i = 0; i < NUM_CHILDREN; i++) {
+        kill(pids[i], SIGINT);
+    }
 }
