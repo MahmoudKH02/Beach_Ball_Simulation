@@ -7,6 +7,11 @@
 #define LAST_A 5
 #define LAST_B 11
 
+// enum TeamPlayers {
+//     LEAD_A, P1A, P2A, P3A, P4A, P5A,
+//     LEAD_B, P1B, P2B, P3B, P4B, P5B
+// };
+
 const int MSG_SIZE = 512;
 
 struct lead_vars {

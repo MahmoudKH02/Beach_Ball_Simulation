@@ -40,6 +40,13 @@ int main(int argc, char *argv[]) {
             sprintf(pipe_w, "%d", fd[i][1]);
             sprintf(player_i, "%d", i);
             
+            if (i == LEAD_A || i == LEAD_B) {
+                execlp(
+                    "./teamLead", "teamLead",
+                    pipe_r, pipe_w, player_i,
+                    NULL
+                );
+            }
             execlp(
                 "./player", "player",
                 pipe_r, pipe_w, player_i,
@@ -88,7 +95,7 @@ int main(int argc, char *argv[]) {
     // send ball to team leads
     kill(pids[LEAD_A], SIGUSR2);
     kill(pids[LEAD_B], SIGUSR2);
-    alarm(50); // 5 minutes
+    // alarm(50); // 5 minutes
 
     if ( signal(SIGUSR1, send_ball_teamA) == SIG_ERR ) {
         perror("Sigset can not set SIGQUIT");
