@@ -12,8 +12,6 @@
 //     LEAD_B, P1B, P2B, P3B, P4B, P5B
 // };
 
-const int MSG_SIZE = 512;
-
 struct lead_vars {
     int energy;
     int fd_pipe[2];

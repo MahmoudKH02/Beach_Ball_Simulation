@@ -1,41 +1,9 @@
 #include "headers.h"
-
-void initialize(sigset_t *sigset, bool team_lead) {
-    if (team_lead) {
-        if ( signal(SIGUSR2, catch_ball_from_teamlead) == SIG_ERR ) {
-            perror("Sigset can not set SIGQUIT");
-            exit(SIGQUIT);
-        }
-    }
-
-    if ( signal(SIGUSR1, catch_ball_from_player) == SIG_ERR ) {
-        perror("Sigset can not set SIGQUIT");
-        exit(SIGQUIT);
-    }
-
-    if ( signal(SIGALRM, decrement_energy) == SIG_ERR ) {
-        perror("Sigset can not set SIGQUIT");
-        exit(SIGQUIT);
-    }
-
-    // the sigset to block signals when needed
-    sigemptyset(sigset);
-    sigaddset(sigset, SIGUSR1);
-    sigaddset(sigset, SIGUSR2);
-}
-
-
-void init_variables() {
-    // initialize energy
-    srand(getpid());
-    energy = (rand() % 31) + 70; // 70 - 100
-
-    num_balls_player = 0;
-}
+#include "functions.h"
 
 
 pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead) {
-    char message[MSG_SIZE];
+    char message[BUFSIZ];
 
     read(r_fd_pipe, message, sizeof(message));
 
@@ -52,6 +20,17 @@ pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead) {
     return atoi(message);
 }
 
+void init_vars(int* energy, int* num_balls_player, int* num_balls_team) {
+    // initialize energy
+    srand(getpid());
+    *energy = (rand() % 31) + 70; // 70 - 100
+
+    *num_balls_player = 0;
+
+    if (num_balls_team)
+        *num_balls_team = 0;
+}
+
 // short pause
 unsigned int get_sleep_duration(int energy, int balls, int player_num) {
     srand(time(NULL));
@@ -60,22 +39,23 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num) {
     // int duration =  (duration / energy);
 
     if (energy <= 100 && energy > 90)
-        duration = (rand() % 4) + 1;
+        duration = (rand() % 2) + 1;
     else if (energy <= 90 && energy > 80)
-        duration = (rand() % 4) + 4;
+        duration = (rand() % 3) + 2;
     else if (energy <= 80 && energy > 70)
-        duration = (rand() % 3) + 7;
+        duration = (rand() % 3) + 4;
     else if (energy <= 70 && energy > 60)
-        duration = (rand() % 4) + 9;
+        duration = (rand() % 3) + 6;
     else
-        duration = (rand() % 3) + 12;
+        duration = (rand() % 3) + 8;
 
+    // calculate drop probability
     int drop_proba;
 
     // get the drop probability
-    if (balls != 0 && balls <= 3)
+    if (balls <= 3)
         drop_proba = (int) 100 - (energy / balls);
-    else
+    else    
         drop_proba = 100;
 
     bool drop_ball = (rand() % 101) < drop_proba;
