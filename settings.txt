@@ -1,2 +1,2 @@
-rounds=5
-round_time=120
+ROUNDS=5
+ROUND_TIME=40

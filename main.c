@@ -1,24 +1,24 @@
 #include "headers.h"
 
-#define MAX_ROUNDS 3
-
 void send_ball_teamA(int);
 void send_ball_teamB(int);
 void end_start_new_round(int);
 
-pid_t pids[NUM_CHILDREN];
-int fd[NUM_CHILDREN][2];
+
+pid_t pids[MAX_PLAYERS];
 
 int current_round = 0;
-int teamA_wins = 0;
-int teamB_wins = 0;
+bool round_finished = false;
 
 int main(int argc, char *argv[]) {
 	int i;
+    int fd[MAX_PLAYERS][2];
 
-    signal(SIGALRM, end_start_new_round);
+    // read game settings
+    readFile("settings.txt");
+    printf("value: %d, %d\n", MAX_ROUNDS, ROUND_TIME);
 
-    for ( i = 0; i < NUM_CHILDREN; i++ ) {
+    for ( i = 0; i < MAX_PLAYERS; i++ ) {
         if ( pipe(fd[i]) < 0 ) {
             // Handle error
             printf("Could not fork child %d\n", i);
@@ -34,8 +34,8 @@ int main(int argc, char *argv[]) {
             exit(-10 * i);
         }
 
+        // child process
         if ( pids[i] == 0 ) {
-            // Child process
             char pipe_r[20];
             char pipe_w[20];
             char player_i[20];
@@ -45,22 +45,19 @@ int main(int argc, char *argv[]) {
             sprintf(player_i, "%d", i);
             
             if (i == LEAD_A || i == LEAD_B) {
-                execlp(
-                    "./teamLead", "teamLead",
-                    pipe_r, pipe_w, player_i,
-                    NULL
-                );
+                execlp("./teamLead", "teamLead", pipe_r, pipe_w, player_i, NULL);
+                perror("Exec Teamlead Failed!!\n");
+                exit(SIGQUIT);
+            } else {
+                execlp("./player", "player", pipe_r, pipe_w, player_i, NULL);
+                perror("Exec Player Failed!!\n");
+                exit(SIGQUIT);
             }
-            execlp(
-                "./player", "player",
-                pipe_r, pipe_w, player_i,
-                NULL
-            );
         }
     }
 
     // Parent process
-    for ( i = 0; i < NUM_CHILDREN; i++ ) {
+    for ( i = 0; i < MAX_PLAYERS; i++ ) {
         // write required pid for child
         char buffer[BUFSIZ];
         memset(buffer, 0x0, BUFSIZ);
@@ -87,33 +84,63 @@ int main(int argc, char *argv[]) {
         }
 
         write(fd[i][1], buffer, sizeof(buffer));
-
-        printf("Child %d pid=%d\n", i, pids[i]);
-        fflush(NULL);
     }
 
     sleep(1);
+
     // send ball to team leads
     kill(pids[LEAD_A], SIGUSR2);
     kill(pids[LEAD_B], SIGUSR2);
-    alarm(60); // 2 minutes
 
-    if ( signal(SIGUSR1, send_ball_teamA) == SIG_ERR ) {
-        perror("Sigset can not set SIGQUIT");
-        exit(SIGQUIT);
-    }
+    int sigs[3] = { SIGUSR1, SIGUSR2, SIGALRM };
+    void (*functionArray[])(int) = { send_ball_teamA, send_ball_teamB, end_start_new_round };
 
-    if ( signal(SIGUSR2, send_ball_teamB) == SIG_ERR ) {
-        perror("Sigset can not set SIGQUIT");
-        exit(SIGQUIT);
-    }
+    set_signals(sigs, functionArray, 3);
 
-    for ( i = 0; i < NUM_CHILDREN; i++ ) {
+    alarm(ROUND_TIME);
+
+    // starting game
+    int teamA_wins = 0;
+    int teamB_wins = 0;
+
+    // parent waiting for events from children
+    do {
+        pause();
+
+        // check who won
+        if (round_finished) {
+            char winner = winning_team(fd, teamA_wins, teamB_wins);
+
+            if (winner == 'A') {
+                printf("Team A won This Round\n");
+                teamA_wins++;
+            } else if (winner == 'B') {
+                printf("Team B won This Round\n");
+                teamB_wins++;
+            } else {
+                printf("Tie Round!\n");
+            }
+            printf("-----------------\n");
+            printf("Starting Round: %d\n", current_round + 1);
+            fflush(NULL);
+            printf("-----------------\n");
+            fflush(NULL);
+        }
+
+    } while (!game_finished(teamA_wins, teamB_wins));
+
+    // wait for children to terminate
+    for ( i = 0; i < MAX_PLAYERS; i++ ) {
         wait(NULL);
+
+        // close the pipes
+        close(fd[i][0]);
+        close(fd[i][1]);
     }
 
     return 0;
 }
+
 
 void send_ball_teamA(int sig) {
     kill(pids[LEAD_A], SIGUSR2);
@@ -126,12 +153,50 @@ void send_ball_teamB(int sig) {
 // alarm signal
 void end_start_new_round(int signum){
     // reset all children
-    for (int i = 0; i < NUM_CHILDREN; i++) {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
         kill(pids[i], SIGRTMIN);
     }
     current_round++;
+    round_finished = true;
+}
 
-    printf("Starting New Round, Round: %d\n", current_round);
+
+void readFile(char* filename){
+    char line[200];
+    char label[50];
+
+    FILE *file;
+    file = fopen(filename, "r");
+
+    if (file == NULL){
+        perror("The file not exist\n");
+        exit(-2);
+    }
+
+    char separator[] = "=";
+
+    while(fgets(line, sizeof(line), file) != NULL){
+
+        char* str = strtok(line, separator);
+        strncpy(label, str, sizeof(label));
+        str = strtok(NULL, separator);
+
+        if (strcmp(label, "ROUNDS") == 0){
+            MAX_ROUNDS = atoi(str);
+        } else if (strcmp(label, "ROUND_TIME") == 0){
+            ROUND_TIME = atoi(str);
+        }
+    }
+
+    fclose(file);
+}
+
+
+char winning_team(int fd[][2], int teamA_wins, int teamB_wins) {
+    // get winning team
+    printf("-----------------\n");
+    fflush(NULL);
+    printf("Round %d Result: \n\n", current_round);
     fflush(NULL);
 
     char buffer[BUFSIZ];
@@ -166,40 +231,49 @@ void end_start_new_round(int signum){
     }
 
     if (ballsA > ballsB)
-        teamB_wins++;
+        return 'B';
     else if (ballsB > ballsA)
-        teamA_wins++;
-    else {
-        printf("Tie Round\n");
-        fflush(NULL);
-    }
+        return 'A';
 
+    return '0';
+}
+
+
+bool game_finished(int teamA_wins, int teamB_wins) {
     // kill all children
-    if (current_round == MAX_ROUNDS) {
-        for (int i = 0; i < NUM_CHILDREN; i++) {
+    if ( current_round == MAX_ROUNDS || best_of(current_round, teamA_wins, teamB_wins) ) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             kill(pids[i], SIGINT);
         }
 
         printf("Team A has %d wins\n", teamA_wins);
-        fflush(NULL);
         printf("Team B has %d wins\n", teamB_wins);
-        fflush(NULL);
 
         if (teamA_wins > teamB_wins) {
             printf("Team A Won\n");
-            fflush(NULL);
-        }
-        else if (teamA_wins < teamB_wins) {
+        } else if (teamA_wins < teamB_wins) {
             printf("Team B Won\n");
-            fflush(NULL);
-        }
-        else {
+        } else {
             printf("Tie\n");
-            fflush(NULL);
         }
-    } else {// start new round
-        alarm(60);
+        fflush(NULL);
+        return true;
+
+    } else if (round_finished) { // start new round
+        sleep(1);
         kill(pids[LEAD_A], SIGUSR2);
         kill(pids[LEAD_B], SIGUSR2);
+        alarm(ROUND_TIME);
+        round_finished = false;
     }
+    return false;
+}
+
+bool best_of(int curr_round, int teamA_wins, int teamB_wins) {
+    if (teamA_wins == (MAX_ROUNDS / 2 + 1))
+        return true;
+    else if (teamB_wins == (MAX_ROUNDS / 2 + 1))
+        return true;
+
+    return false;
 }
