@@ -14,7 +14,7 @@ struct teamlead_var leader;
 
 
 int main(int argc, char *argv[]) {
-    if (argc < 4) {
+    if (argc < 5) {
         perror("Not enough arguments\n");
         exit(-1);
     }
@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
     leader.fd_pipe[1] = atoi(argv[2]);
     
     leader.player_num = atoi(argv[3]);
+
+    strcpy(leader.fifo_name, argv[4]);
 
     // read the pids from parent
     pid_t other_team_lead;
@@ -45,12 +47,12 @@ int main(int argc, char *argv[]) {
 
         while (leader.num_balls_player > 0) {
             if (s == 0)
-                s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num);
+                s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num, leader.fifo_name);
             
             while ( (s = sleep(s)) > 0 );
             
             if (leader.num_balls_player > 1)
-                s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num);
+                s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num, leader.fifo_name);
             
             if (round_finished)
                 break;
@@ -89,15 +91,14 @@ void pass_ball(int next_pid, int other_team_lead) {
         fflush(NULL);
         leader.num_balls_team--;
         leader.num_balls_player--;
-        pass_to_next_team = false;
 
-        // ask parent to pass ball
-        if (leader.num_balls_team == 0) {
-            if (leader.player_num == LEAD_A)
-                kill(getppid(), SIGUSR1);
-            else
-                kill(getppid(), SIGUSR2);
-        }  
+        // // ask parent to pass ball
+        // if (leader.num_balls_team == 0) {
+        //     if (leader.player_num == LEAD_A)
+        //         kill(getppid(), SIGUSR1);
+        //     else
+        //         kill(getppid(), SIGUSR2);
+        // }  
     } else {
         kill(next_pid, SIGUSR1);
 
@@ -111,6 +112,37 @@ void pass_ball(int next_pid, int other_team_lead) {
         fflush(NULL);
         leader.num_balls_player--;
     }
+
+    char msg_s[BUFSIZ];
+
+    int f = open(leader.fifo_name, O_RDONLY | O_NONBLOCK);
+
+    if ((f = open(leader.fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
+        perror("Open Error\n");
+        exit(-1);
+    } else {
+        if (leader.player_num == 0) {
+            if (pass_to_next_team)
+                sprintf(msg_s, "P,%d", LEAD_B);
+            else
+                sprintf(msg_s, "P,%d", leader.player_num + 1);
+        }
+        else {
+            if (pass_to_next_team)
+                sprintf(msg_s, "P,%d", LEAD_A);
+            else
+                sprintf(msg_s, "P,%d", leader.player_num + 1);
+
+        }
+
+        if ( write(f, msg_s, sizeof(msg_s)) == -1){
+            perror("Write Error\n");
+            exit(-1);
+        }
+    }
+    close(f);
+    pass_to_next_team = false;
+
 }
 
 

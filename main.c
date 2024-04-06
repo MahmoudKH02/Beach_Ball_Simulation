@@ -10,13 +10,47 @@ pid_t pids[MAX_PLAYERS];
 int current_round = 0;
 bool round_finished = false;
 
+
 int main(int argc, char *argv[]) {
 	int i;
     int fd[MAX_PLAYERS][2];
+    pid_t drawer_pid;
+    char* fifos[MAX_PLAYERS];
 
     // read game settings
     readFile("settings.txt");
     printf("value: %d, %d\n", MAX_ROUNDS, ROUND_TIME);
+
+
+    for (i = 0; i < MAX_PLAYERS; i++) {
+        fifos[i] = (char*) malloc(sizeof("/tmp/fifo--") + 1);
+        strcpy(fifos[i], FIFO_PATH);
+        
+		if (i < 6) {
+            char num[20];
+            sprintf(num, "A%d", i);
+            strcat(fifos[i], num);
+            
+		} else {
+            char num[20];
+            sprintf(num, "B%d", i-6);
+            strcat(fifos[i], num);
+        }
+
+        // Remove any existing file with the same name
+        if (access(fifos[i], F_OK) != -1) {
+            if (remove(fifos[i]) == -1) {
+                perror("Error removing existing FIFO");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        if (mkfifo(fifos[i], __S_IFIFO | 0777) == -1){
+            perror("Fifo Error\n");
+            exit(-1);
+        }
+	}
+    
 
     for ( i = 0; i < MAX_PLAYERS; i++ ) {
         if ( pipe(fd[i]) < 0 ) {
@@ -25,7 +59,6 @@ int main(int argc, char *argv[]) {
             exit(-1 * i);
         }
 
-        //fcntl(fd[i], 
         pids[i] = fork();
 
         if ( pids[i] < 0 ) {
@@ -45,16 +78,65 @@ int main(int argc, char *argv[]) {
             sprintf(player_i, "%d", i);
             
             if (i == LEAD_A || i == LEAD_B) {
-                execlp("./teamLead", "teamLead", pipe_r, pipe_w, player_i, NULL);
+                execlp("./teamLead", "teamLead", pipe_r, pipe_w, player_i, fifos[i], NULL);
+                // execlp("./teamLead", "teamLead", pipe_r, pipe_w, player_i, "fifos[i]", NULL);
                 perror("Exec Teamlead Failed!!\n");
                 exit(SIGQUIT);
             } else {
-                execlp("./player", "player", pipe_r, pipe_w, player_i, NULL);
+                execlp("./player", "player", pipe_r, pipe_w, player_i, fifos[i], NULL);
+                // execlp("./player", "player", pipe_r, pipe_w, player_i, "fifos[i]", NULL);
                 perror("Exec Player Failed!!\n");
                 exit(SIGQUIT);
             }
         }
     }
+
+    drawer_pid = fork();
+
+    // drawer process
+    if (drawer_pid == 0) {
+        execlp("./drawer", "drawer", NULL);
+        perror("Exec Drawer Failed!!\n");
+        exit(SIGQUIT);
+    }
+
+    // char msg_s[BUFSIZ];
+
+
+    // int f = open(fifos[1], O_RDONLY | O_NONBLOCK);
+
+
+    // if ((f = open(fifos[1], O_WRONLY | O_NONBLOCK)) == -1){
+    //     perror("Open Error\n");
+    //     exit(-1);
+    // } else {
+
+    //     strcpy(msg_s, "Find 5*5");
+    //     if ( write(f, msg_s, sizeof(msg_s)) == -1){
+    //         perror("Write Error\n");
+    //         exit(-1);
+    //     }
+    // }
+
+    // close(f);
+
+    
+    // if ((f = open("/tmp/fifoA1", O_RDONLY | O_NONBLOCK)) == -1) {
+    //     perror("Open Error Parent\n");
+    //     exit(-1);
+    // } else {
+
+    //     int nbytes = read(f, msg_r, BUFSIZ-1); // Read up to BUFSIZ-1 bytes
+
+    //     if (nbytes >= 0) {
+    //         msg_r[nbytes] = '\0'; // Null-terminate the string
+    //         printf("Message: %s\n", msg_r);
+    //         fflush(NULL);
+    //     } else {
+    //         perror("read from LEAD_B failed");
+    //     }
+    // }
+
 
     // Parent process
     for ( i = 0; i < MAX_PLAYERS; i++ ) {
@@ -90,7 +172,7 @@ int main(int argc, char *argv[]) {
 
     // send ball to team leads
     kill(pids[LEAD_A], SIGUSR2);
-    kill(pids[LEAD_B], SIGUSR2);
+    // kill(pids[LEAD_B], SIGUSR2);
 
     int sigs[3] = { SIGUSR1, SIGUSR2, SIGALRM };
     void (*functionArray[])(int) = { send_ball_teamA, send_ball_teamB, end_start_new_round };
@@ -137,6 +219,14 @@ int main(int argc, char *argv[]) {
         close(fd[i][0]);
         close(fd[i][1]);
     }
+
+    // remove the fifos
+    for (i = 0; i < MAX_PLAYERS; i++)
+        unlink(fifos[i]);
+
+
+    for (i = 0; i < MAX_PLAYERS; i++)
+        free(fifos[i]);
 
     return 0;
 }
@@ -262,7 +352,7 @@ bool game_finished(int teamA_wins, int teamB_wins) {
     } else if (round_finished) { // start new round
         sleep(1);
         kill(pids[LEAD_A], SIGUSR2);
-        kill(pids[LEAD_B], SIGUSR2);
+        // kill(pids[LEAD_B], SIGUSR2);
         alarm(ROUND_TIME);
         round_finished = false;
     }

@@ -1,22 +1,43 @@
-#include <GL/glut.h>
-#include <math.h>
-#include <string.h>
-#include <stdio.h>
+#include "headers.h"
+
+char fifos[MAX_PLAYERS][100] = {
+    "/tmp/fifoA0",
+    "/tmp/fifoA1",
+    "/tmp/fifoA2",
+    "/tmp/fifoA3",
+    "/tmp/fifoA4",
+    "/tmp/fifoA5",
+    "/tmp/fifoB0",
+    "/tmp/fifoB1",
+    "/tmp/fifoB2",
+    "/tmp/fifoB3",
+    "/tmp/fifoB4",
+    "/tmp/fifoB5"
+};
+
+struct ball balls[30];
+int num_balls = 0;
+
+char msg_r[BUFSIZ];
 
 // Global variables for ball position and movement
 float ballX = -0.5f; // Initial x-coordinate of the ball (with the first team lead)
 float ballY = 0.4f;  // Initial y-coordinate of the ball (with the first team lead)
-float ballSpeed = 0.005f; // Speed of the ball
+float ballSpeed = 0.5f; // Speed of the ball
 
-// Sequence of positions for the ball to follow
 float ballPositions[][2] = {
-    {-0.5f, 0.4f},  // Starting position with team lead
-    {-0.76f, -0.1f}, // Horizontal movement to first player
-    {-0.63f, -0.1f}, // Horizontal movement to second player
-    {-0.5f, -0.1f}, // Horizontal movement to third player
-    {-0.37f, -0.1f},  // Horizontal movement to fourth player
-    {-0.24f, -0.1f},  // Horizontal movement to fifth player
-    {-0.5f, 0.4f} // Back to team lead
+    {-0.5f, 0.4f},    // Starting position with team lead A
+    {-0.85f, -0.1f},  // Horizontal movement to first player of team A
+    {-0.67f, -0.1f},  // Horizontal movement to second player of team A
+    {-0.49f, -0.1f},  // Horizontal movement to third player of team A
+    {-0.31f, -0.1f},  // Horizontal movement to fourth player of team A
+    {-0.13f, -0.1f},  // Horizontal movement to fifth player of team A
+    {0.5f, 0.4f},     // position of team lead B
+    {0.15f, -0.1f},   // Horizontal movement to first player of team B
+    {0.33f, -0.1f},   // Horizontal movement to second player of team B
+    {0.51f, -0.1f},   // Horizontal movement to third player of team B
+    {0.69f, -0.1f},   // Horizontal movement to fourth player of team B
+    {0.87f, -0.1f},   // Horizontal movement to fifth player of team B
 };
 
 int currentBallPositionIndex = 0; // Index of the current position in the sequence
@@ -43,6 +64,16 @@ void drawCircle(float cx, float cy, float r, int num_segments) {
 // Function to draw a rectangle
 void drawRectangle(float x, float y, float width, float height) {
     glBegin(GL_QUADS);
+    glVertex2f(x, y);
+    glVertex2f(x + width, y);
+    glVertex2f(x + width, y + height);
+    glVertex2f(x, y + height);
+    glEnd();
+}
+
+// Function to draw a rectangle filled
+void drawRectangleLine(float x, float y, float width, float height) {
+    glBegin(GL_LINE_LOOP);
     glVertex2f(x, y);
     glVertex2f(x + width, y);
     glVertex2f(x + width, y + height);
@@ -135,34 +166,73 @@ void drawParent(float x, float y) {
     glEnd();
 }
 
+int ball_index(int player) {
+    for (int i = 0; i < 30; i++) {
+        if (balls[i].player_id == player)
+            return i;
+    }
+    return 0;
+}
+
+// array of structs
+// struct: ballNumber, player (position), bool to_who (to other team or to next player)
 // Function to update the position of the ball
+// fifo A5 --> P,0 --> clean ball
+// fifo A5 --> D --> dropped ball
 void updateBallPosition() {
-    // Check if the ball reaches the end of the sequence
-    if (currentBallPositionIndex >= sizeof(ballPositions) / sizeof(ballPositions[0]))
-        return;
+    // read from fifo
+    int f;
+    int bytes;
 
-    // Move the ball towards the next position
-    float targetX = ballPositions[currentBallPositionIndex][0];
-    float targetY = ballPositions[currentBallPositionIndex][1];
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if ((f = open(fifos[i], O_RDONLY | O_NONBLOCK)) == -1) {
+            perror("Open Error Drawer\n");
+            fflush(NULL);
+            exit(-1);
+        } else {
+            if ( (bytes = read(f, msg_r, sizeof(msg_r))) == -1) {
+                perror("Read Error\n");
+                fflush(NULL);
+                exit(-1);
+            } else if (bytes > 0) {   
+                // update struct
+                strtok(msg_r, ",");
+                
+                if (strcmp(msg_r, "P") == 0) { // pass ball
+                    char* str = strtok('\0', ",");
 
-    if (ballX < targetX)
-        ballX += ballSpeed;
-    else if (ballX > targetX)
-        ballX -= ballSpeed;
+                    int target = atoi(str); // target position // 2
+                    int ball_i = 0;
 
-    if (ballY < targetY)
-        ballY += ballSpeed;
-    else if (ballY > targetY)
-        ballY -= ballSpeed;
+                    balls[ball_i].player_id = target;
+                    balls[ball_i].target_ball_position = target;
 
-    // Check if the ball reaches the target position
-    if (fabs(ballX - targetX) <= ballSpeed && fabs(ballY - targetY) <= ballSpeed) {
-        currentBallPositionIndex++; // Move to the next position in the sequence
-
-        // Check if the ball returns to the team lead
-        if (currentBallPositionIndex >= sizeof(ballPositions) / sizeof(ballPositions[0])) {
-            currentBallPositionIndex = 0; // Reset to start the sequence again
+                } else if (strcmp(msg_r, "D") == 0) {
+                    // change color...
+                }
+            }
         }
+        close(f);
+    }
+
+    for (int i = 0; i < num_balls; i++) {
+        printf("Ball (%d): current=%f, target=%d\n", i, balls[i].current_ball_position[0], balls[i].target_ball_position);
+        fflush(NULL);
+    }
+
+// Calculate the direction and distance to move
+    float dx = ballPositions[ balls[0].target_ball_position ][0] - balls[0].current_ball_position[0];
+    float dy = ballPositions[ balls[0].target_ball_position ][1] - balls[0].current_ball_position[1];
+    float distance = sqrt(dx * dx + dy * dy);
+
+    // Move the ball towards the target position
+    if (distance > ballSpeed) {
+        balls[0].current_ball_position[0] += (dx / distance) * ballSpeed;
+        balls[0].current_ball_position[1] += (dy / distance) * ballSpeed;
+    } else {
+        // If the distance is less than the speed, snap the ball to the target position
+        balls[0].current_ball_position[0] = ballPositions[ balls[0].target_ball_position ][0];
+        balls[0].current_ball_position[1] = ballPositions[ balls[0].target_ball_position ][1];
     }
 
     glutPostRedisplay(); // Request redisplay to continuously update the scene
@@ -209,6 +279,8 @@ void display() {
 		char s[10];
 		sprintf(s, "P%d", i+1);
 		drawText(-0.88f + i * 0.18f, 0.06, s);
+		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+		drawRectangleLine(-0.93f + i * 0.18f, -0.3, 0.17, 0.02);
     }
 
     // Draw the children (players) for team 2
@@ -218,17 +290,36 @@ void display() {
 		char s[10];
 		sprintf(s, "P%d", i+1);
 		drawText(0.13f + i * 0.18f, 0.06, s);
+		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+		drawRectangleLine(0.06f + i * 0.18f, -0.3, 0.17, 0.02);
     }
+
 
     // Draw the ball
     glColor3f(0.0f, 1.0f, 0.0f); // Set color to green
-    drawCircle(ballX, ballY, 0.03f, 20); // Draw the ball at its position
+    drawCircle(balls[0].current_ball_position[0], balls[0].current_ball_position[1], 0.03f, 20); // Draw the ball at its position
 
     glutSwapBuffers(); // Swap the front and back frame buffers (double buffering)
 }
 
 // Main function
 int main(int argc, char** argv) {
+    sleep(5);
+    
+    // balls with team leads
+    // balls with Lead A
+    balls[num_balls].target_ball_position = 0;
+    balls[num_balls].current_ball_position[0] = ballPositions[LEAD_A][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[LEAD_A][1];
+    num_balls++;
+    
+    // balls with Lead B
+    balls[num_balls].target_ball_position = LEAD_B;
+    balls[num_balls].current_ball_position[0] = ballPositions[LEAD_B][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[LEAD_B][1];
+    num_balls++;
+
+
     glutInit(&argc, argv); // Initialize GLUT
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); // Enable double buffering, RGB colors, and depth buffer
     glutInitWindowSize(950, 950); // Set the window size

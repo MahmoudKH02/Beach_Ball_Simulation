@@ -22,11 +22,13 @@
 #include <sys/shm.h>
 #include <errno.h>
 #include <stdbool.h>
-// #include <GL/glut.h>
+#include <math.h>
+#include <GL/glut.h>
+
 
 #include "constants.h"
 
-unsigned int get_sleep_duration(int energy, int balls_with_player, int player_num);
+unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fifo_name);
 pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead);
 void init_vars(int* energy, int* num_balls_player, int* num_balls_team);
 void set_signals(int signals[], void (*functionArray[])(int), int num_of_signals);

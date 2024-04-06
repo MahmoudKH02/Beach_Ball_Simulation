@@ -40,11 +40,10 @@ void init_vars(int* energy, int* num_balls_player, int* num_balls_team) {
 }
 
 // short pause
-unsigned int get_sleep_duration(int energy, int balls, int player_num) {
+unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fifo_name) {
     srand(time(NULL));
 
     int duration;
-    // int duration =  (duration / energy);
 
     if (energy <= 100 && energy > 90)
         duration = (rand() % 2) + 1;
@@ -72,6 +71,24 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num) {
         printf("player(%d) dropped the ball\n", player_num);
         fflush(NULL);
         duration += 2;
+
+        char msg_s[BUFSIZ];
+
+        int f = open(fifo_name, O_RDONLY | O_NONBLOCK);
+
+        if ((f = open(fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
+            perror("Open Error\n");
+            exit(-1);
+        } else {
+
+            strcpy(msg_s, "D");
+            
+            if ( write(f, msg_s, sizeof(msg_s)) == -1){
+                perror("Write Error\n");
+                exit(-1);
+            }
+        }
+        close(f);
     }
 
     return duration;
@@ -91,61 +108,81 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num) {
 
 *******************************************************************************
 */
+// void createFifos() {
 
-// extern int MAX_ROUNDS;
+//     // creating teh fifo
+//     remove(fifo1);
 
-// char winning_team(int fd[][2], int teamA_wins, int teamB_wins, int current_round) {
-//     // get winning team
-//     printf("-----------------\n");
-//     fflush(NULL);
-//     printf("Round %d Result: \n\n", current_round);
-//     fflush(NULL);
-
-//     char buffer[BUFSIZ];
-//     memset(buffer, 0x0, BUFSIZ);
-//     int ballsA, ballsB;
-    
-//     // team A
-//     int nbytes = read(fd[LEAD_A][0], buffer, BUFSIZ-1); // Read up to BUFSIZ-1 bytes
-
-//     if (nbytes >= 0) {
-//         buffer[nbytes] = '\0'; // Null-terminate the string
-//         printf("Balls A: %s\n", buffer);
-//         fflush(NULL);
-//         ballsA = atoi(buffer);
-//     } else {
-//         perror("read from LEAD_A failed");
+//     if (mkfifo(fifo1, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
 //     }
 
-//     // Reset buffer before reading next data
-//     memset(buffer, 0x0, BUFSIZ);
+//     remove(fifo2);
 
-//     // team B
-//     nbytes = read(fd[LEAD_B][0], buffer, BUFSIZ-1); // Read up to BUFSIZ-1 bytes
-
-//     if (nbytes >= 0) {
-//         buffer[nbytes] = '\0'; // Null-terminate the string
-//         printf("Balls B: %s\n", buffer);
-//         fflush(NULL);
-//         ballsB = atoi(buffer);
-//     } else {
-//         perror("read from LEAD_B failed");
+//     if (mkfifo(fifo2, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
 //     }
 
-//     if (ballsA > ballsB)
-//         return 'B';
-//     else if (ballsB > ballsA)
-//         return 'A';
+//     remove(fifo3);
 
-//     return '0';
-// }
+//     if (mkfifo(fifo3, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
 
+//     remove(fifo4);
+//     if (mkfifo(fifo4, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
 
-// bool best_of(int curr_round, int teamA_wins, int teamB_wins) {
-//     if (teamA_wins == (MAX_ROUNDS / 2 + 1))
-//         return true;
-//     else if (teamB_wins == (MAX_ROUNDS / 2 + 1))
-//         return true;
+//     remove(fifo5);
+//     if (mkfifo(fifo5, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
 
-//     return false;
+//     remove(fifo6);
+//     if (mkfifo(fifo6, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo7);
+//     if (mkfifo(fifo7, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo8);
+//     if (mkfifo(fifo8, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo9);
+//     if (mkfifo(fifo9, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo10);
+//     if (mkfifo(fifo10, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo11);
+//     if (mkfifo(fifo11, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
+
+//     remove(fifo12);
+//     if (mkfifo(fifo12, __S_IFIFO | 0777) == -1){
+//         perror("Fifo Error\n");
+//         exit(-1);
+//     }
 // }
