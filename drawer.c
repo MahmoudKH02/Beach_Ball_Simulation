@@ -1,5 +1,9 @@
 #include "headers.h"
 
+void send_ball_a(int sig);
+void send_ball_b(int sig);
+void end_round(int sig);
+
 char fifos[MAX_PLAYERS][100] = {
     "/tmp/fifoA0",
     "/tmp/fifoA1",
@@ -15,13 +19,18 @@ char fifos[MAX_PLAYERS][100] = {
     "/tmp/fifoB5"
 };
 
-struct Ball balls[30];
+int fd_pipe[2];
+
+struct Ball balls[MAX_BALLS];
 
 int num_balls = 0;
 
 char msg_r[BUFSIZ];
+char last_winner[BUFSIZ];
 
-float energy_bars[12];
+float energy_bars[MAX_PLAYERS];
+int players_balls[MAX_PLAYERS]; // balls with each player
+bool round_finished = false;
 
 // Global variables for ball position and movement
 float ballX = -0.5f; // Initial x-coordinate of the ball (with the first team lead)
@@ -195,9 +204,10 @@ void read_fifo() {
                 exit(-1);
             } else if (bytes > 0) {   
                 // update struct
-                printf("str: %s\n", msg_r);
-                strtok(msg_r, ",");
+                printf("str (%d): %s | bytes=%d\n", i, msg_r, bytes);
                 fflush(NULL);
+                
+                strtok(msg_r, ",");
 
                 if (strcmp(msg_r, "P") == 0) { 
                     char* string = strtok('\0', ",");
@@ -214,7 +224,8 @@ void read_fifo() {
 
                     balls[ball_i].player_id = target;
                     balls[ball_i].target_ball_position = target;
-
+                    players_balls[target]++;
+                    players_balls[i]--;
                 } else if (strcmp(msg_r, "D") == 0) {
                     // change color...
 
@@ -278,15 +289,30 @@ void display() {
 	glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
 	drawText(-0.12f, 0.9f, "The Parent");
 
+    char s[BUFSIZ + 200];
+
     // Draw the team leads
     // For team 1 (red)
     drawTeamLead(-0.5f, 0.4f, 1.0f, 0.0f, 0.0f); // Team lead 1
-	glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
-	drawText(-0.63f, 0.60f, "Team Lead A");
+    glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
+    drawText(-0.63f, 0.60f, "Team Lead A");
+    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+    drawRectangleLine(-0.59f, 0.19f, 0.17f, 0.02f);
+    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+    drawRectangle(-0.59f, 0.19f, 0.17f * energy_bars[0], 0.02f);
+    // draw the energy level text
+    sprintf(s, "E=%d", (int) (energy_bars[LEAD_A] * 100));
+    glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+    drawText(-0.5f, 0.35, s);
+
     // For team 2 (blue)
     drawTeamLead(0.5f, 0.4f, 0.0f, 0.0f, 1.0f); // Team lead 2
-	glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
-	drawText(0.35f, 0.60f, "Team Lead B");
+    glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
+    drawText(0.35f, 0.60f, "Team Lead B");
+    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+    drawRectangleLine(0.41f, 0.19f, 0.17f, 0.02f);
+    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+    drawRectangle(0.41f, 0.19f, 0.17f * energy_bars[6], 0.02f);
 
     // Draw the children (players) for team 1
     for(int i = 0; i < 5; i++) {
@@ -294,7 +320,6 @@ void display() {
 		ballPositions[i+1][0] = -0.85f + i * 0.18f;
 		ballPositions[i+1][1] = -0.1;
 		glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
-		char s[10];
 		sprintf(s, "P%d", i+1);
 		drawText(-0.88f + i * 0.18f, 0.06, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
@@ -302,14 +327,17 @@ void display() {
 
         glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
         drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
-        // drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f, 0.02f);
+
+        sprintf(s, "E=%d", (int) (energy_bars[i] * 100));
+        glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+		drawText(-0.9f + i * 0.18f, -0.35, s);
     }
 
     // Draw the children (players) for team 2
     for(int i = 0; i < 5; i++) {
         drawPlayer(0.15f + i * 0.18f, -0.1, 0.0f, 0.0f, 1.0f); // Team 2 players (blue)
 		glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
-		char s[10];
+
 		sprintf(s, "P%d", i+1);
 		drawText(0.13f + i * 0.18f, 0.06, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
@@ -317,25 +345,39 @@ void display() {
         
         glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
         drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
-        // drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f, 0.02f);
+
+        sprintf(s, "E=%d", (int) (energy_bars[i+6] * 100));
+        glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+		drawText(0.09f + i * 0.18f, -0.35, s);
     }
 
-
+    glColor3f(0, 0.647f, 0.34f); // set color to orange
+    sprintf(s, "Last Round Winner: %s", last_winner);
+    drawText(-0.3f, -0.6f, s);
 
     // Draw the ball
-    glColor3f(0.0f, 1.0f, 0.0f); // Set color to green
-    drawCircle(balls[0].current_ball_position[0], balls[0].current_ball_position[1], 0.03f, 20); // Draw the ball at its position
-    
-    glColor3f(1.0f, 1.0f, 1.0f); // Set color to green
-    drawCircle(balls[1].current_ball_position[0], balls[1].current_ball_position[1], 0.03f, 20); // Draw the ball at its position
+    for (int i = 0; i < num_balls; i++) {
+        glColor3f(balls[i].colorR, balls[i].colorG, balls[i].colorB); // Set color to green
+        float displacement = (players_balls[ balls[i].player_id ] - 1) * (0.03f * i);
+        drawCircle(balls[i].current_ball_position[0], balls[i].current_ball_position[1] + displacement, 0.03f, 20); // Draw the ball at its position
+    }
 
     glutSwapBuffers(); // Swap the front and back frame buffers (double buffering)
 }
 
+
 // Main function
 int main(int argc, char** argv) {
-    sleep(1);
-    read_fifo();
+
+    if (argc < 3) {
+        perror("Not enough args");
+        exit(SIGQUIT);
+    }
+
+    fd_pipe[0] = atoi(argv[1]);
+    fd_pipe[1] = atoi(argv[2]);
+
+    strcpy(last_winner, "No One Yet");
     
     // balls with team leads
     // balls with Lead A
@@ -343,14 +385,44 @@ int main(int argc, char** argv) {
     balls[num_balls].target_ball_position = LEAD_A;
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+    
+    balls[num_balls].colorR = 0.1;
+    balls[num_balls].colorG = 0.5;
+    balls[num_balls].colorB = 0.5;
     num_balls++;
+    players_balls[LEAD_A] = 1;
     
     // balls with Lead B
     balls[num_balls].player_id = 6;
     balls[num_balls].target_ball_position = LEAD_B;
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+
+    balls[num_balls].colorR = 0.9;
+    balls[num_balls].colorG = 0;
+    balls[num_balls].colorB = 0.9;
+
     num_balls++;
+    players_balls[LEAD_B] = 1;
+
+    sleep(1);
+    read_fifo();
+
+    // set signals
+    if ( signal(SIGUSR1, send_ball_a) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    if ( signal(SIGUSR2, send_ball_b) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    if ( signal(SIGRTMIN, end_round) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
 
 
     glutInit(&argc, argv); // Initialize GLUT
@@ -364,6 +436,57 @@ int main(int argc, char** argv) {
     glutIdleFunc(updateBallPosition); // Register the update function
 
     glutMainLoop(); // Enter the GLUT event processing loop
-
     return 0;
 }
+
+// recieve signal
+void send_ball_a(int sig) {
+    balls[num_balls].player_id = LEAD_A;
+    balls[num_balls].target_ball_position = LEAD_A;
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+
+    balls[num_balls].colorR = 1;
+    balls[num_balls].colorG = 1;
+    balls[num_balls].colorB = 1;
+    num_balls++;
+}
+
+// recieve signal
+void send_ball_b(int sig) {
+    balls[num_balls].player_id = LEAD_B;
+    balls[num_balls].target_ball_position = LEAD_B;
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+
+    balls[num_balls].colorR = 1;
+    balls[num_balls].colorG = 1;
+    balls[num_balls].colorB = 1;
+    num_balls++;
+}
+
+void end_round(int sig) {
+    for (int i = 0; i < num_balls; i++) {
+        // reset balls
+        balls[i].player_id = 0;
+        balls[i].target_ball_position = 0;
+        balls[i].current_ball_position[0] = ballPositions[12][0];
+        balls[i].current_ball_position[1] = ballPositions[12][1];
+    }
+    
+    balls[1].player_id = 6;
+    balls[1].target_ball_position = LEAD_B;
+
+    num_balls = 2;
+
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        players_balls[i] = 0;
+
+    last_winner[BUFSIZ];
+    memset(last_winner, 0x0, sizeof(last_winner));
+
+    read(fd_pipe[0], last_winner, sizeof(last_winner));
+
+    round_finished = true;
+}
+

@@ -6,6 +6,8 @@ void end_start_new_round(int);
 
 
 pid_t pids[MAX_PLAYERS];
+pid_t drawer_pid;
+int drawer_pipe[2];
 
 int current_round = 0;
 bool round_finished = false;
@@ -14,7 +16,6 @@ bool round_finished = false;
 int main(int argc, char *argv[]) {
 	int i;
     int fd[MAX_PLAYERS][2];
-    pid_t drawer_pid;
     char* fifos[MAX_PLAYERS];
 
     // read game settings
@@ -91,52 +92,27 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if ( pipe(drawer_pipe) < 0 ) {
+        // Handle error
+        printf("Could not fork child %d\n", i);
+        exit(-1);
+    }
+
     drawer_pid = fork();
 
     // drawer process
     if (drawer_pid == 0) {
-        execlp("./drawer", "drawer", NULL);
+        char r_pipe[20];
+        char w_pipe[20];
+
+        sprintf(r_pipe, "%d", drawer_pipe[0]);
+        sprintf(w_pipe, "%d", drawer_pipe[1]);
+
+        execlp("./drawer", "drawer", r_pipe, w_pipe, NULL);
         perror("Exec Drawer Failed!!\n");
         exit(SIGQUIT);
     }
     sleep(10);
-
-    // char msg_s[BUFSIZ];
-
-
-    // int f = open(fifos[1], O_RDONLY | O_NONBLOCK);
-
-
-    // if ((f = open(fifos[1], O_WRONLY | O_NONBLOCK)) == -1){
-    //     perror("Open Error\n");
-    //     exit(-1);
-    // } else {
-
-    //     strcpy(msg_s, "Find 5*5");
-    //     if ( write(f, msg_s, sizeof(msg_s)) == -1){
-    //         perror("Write Error\n");
-    //         exit(-1);
-    //     }
-    // }
-
-    // close(f);
-
-    
-    // if ((f = open("/tmp/fifoA1", O_RDONLY | O_NONBLOCK)) == -1) {
-    //     perror("Open Error Parent\n");
-    //     exit(-1);
-    // } else {
-
-    //     int nbytes = read(f, msg_r, BUFSIZ-1); // Read up to BUFSIZ-1 bytes
-
-    //     if (nbytes >= 0) {
-    //         msg_r[nbytes] = '\0'; // Null-terminate the string
-    //         printf("Message: %s\n", msg_r);
-    //         fflush(NULL);
-    //     } else {
-    //         perror("read from LEAD_B failed");
-    //     }
-    // }
 
 
     // Parent process
@@ -185,24 +161,19 @@ int main(int argc, char *argv[]) {
     // starting game
     int teamA_wins = 0;
     int teamB_wins = 0;
+    char* winner;
 
     // parent waiting for events from children
     do {
         pause();
 
+
         // check who won
         if (round_finished) {
-            char winner = winning_team(fd, teamA_wins, teamB_wins);
+            winner = winning_team(fd, teamA_wins, teamB_wins);
 
-            if (winner == 'A') {
-                printf("Team A won This Round\n");
-                teamA_wins++;
-            } else if (winner == 'B') {
-                printf("Team B won This Round\n");
-                teamB_wins++;
-            } else {
-                printf("Tie Round!\n");
-            }
+            printf("The winner is: %s\n", winner);
+
             printf("-----------------\n");
             printf("Starting Round: %d\n", current_round + 1);
             fflush(NULL);
@@ -210,7 +181,7 @@ int main(int argc, char *argv[]) {
             fflush(NULL);
         }
 
-    } while (!game_finished(teamA_wins, teamB_wins));
+    } while (!game_finished(teamA_wins, teamB_wins, winner));
 
     // wait for children to terminate
     for ( i = 0; i < MAX_PLAYERS; i++ ) {
@@ -235,10 +206,14 @@ int main(int argc, char *argv[]) {
 
 void send_ball_teamA(int sig) {
     kill(pids[LEAD_A], SIGUSR2);
+    // signal drawer.
+    kill(drawer_pid, SIGUSR1);
 }
 
 void send_ball_teamB(int sig) {
     kill(pids[LEAD_B], SIGUSR2);
+    // signal drawer 
+    kill(drawer_pid, SIGUSR2);
 }
 
 // alarm signal
@@ -283,7 +258,7 @@ void readFile(char* filename){
 }
 
 
-char winning_team(int fd[][2], int teamA_wins, int teamB_wins) {
+char* winning_team(int fd[][2], int teamA_wins, int teamB_wins) {
     // get winning team
     printf("-----------------\n");
     fflush(NULL);
@@ -322,15 +297,15 @@ char winning_team(int fd[][2], int teamA_wins, int teamB_wins) {
     }
 
     if (ballsA > ballsB)
-        return 'B';
+        return "Team B";
     else if (ballsB > ballsA)
-        return 'A';
+        return "Team A";
 
-    return '0';
+    return "Tie";
 }
 
 
-bool game_finished(int teamA_wins, int teamB_wins) {
+bool game_finished(int teamA_wins, int teamB_wins, char* last_round_result) {
     // kill all children
     if ( current_round == MAX_ROUNDS || best_of(current_round, teamA_wins, teamB_wins) ) {
         for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -351,9 +326,16 @@ bool game_finished(int teamA_wins, int teamB_wins) {
         return true;
 
     } else if (round_finished) { // start new round
-        sleep(1);
         kill(pids[LEAD_A], SIGUSR2);
         kill(pids[LEAD_B], SIGUSR2);
+
+        // write result to drawer
+        char msg[BUFSIZ];
+        sprintf(msg ,"%s", last_round_result);
+        write(drawer_pipe[1], msg, sizeof(msg));
+
+        kill(drawer_pid, SIGRTMIN);
+        sleep(8);
         alarm(ROUND_TIME);
         round_finished = false;
     }

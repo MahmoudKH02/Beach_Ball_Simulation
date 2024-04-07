@@ -2,7 +2,6 @@
 
 void pass_ball(int, int);
 void reset(int);
-void write_fifo(char* msg);
 
 void catch_ball_from_player(int);
 void catch_ball_from_teamlead (int);
@@ -36,17 +35,10 @@ int main(int argc, char *argv[]) {
 
     set_signals(sigArr, functionArray, 4);
 
-    init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team);
-
-    // write energy to fifo pipe
-    char msg[BUFSIZ];
-    sprintf(msg, "E,%f", (leader.energy / 100.0));
-    write_fifo(msg);
-    printf("Energy Child (%d): %d\n", leader.player_num, leader.energy);
-    fflush(NULL);
+    init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
 
     while (1) {
-        alarm(19);
+        alarm(17);
         pause();
 
         round_finished = false;
@@ -90,8 +82,8 @@ void catch_ball_from_teamlead(int sig) {
 
 
 void pass_ball(int next_pid, int other_team_lead) {
-    char msg_s[BUFSIZ];
     leader.num_balls_player--;
+    char msg_s[BUFSIZ];
 
     if (leader.pass_to_next_team[leader.num_balls_player]) {
         kill(other_team_lead, SIGUSR2);
@@ -102,15 +94,15 @@ void pass_ball(int next_pid, int other_team_lead) {
         leader.pass_to_next_team[leader.num_balls_player] = false;
         leader.num_balls_team--;
 
-        sprintf(msg_s, "P,%d,%f", (leader.player_num == LEAD_A)? LEAD_B:LEAD_A, (leader.energy / 100.0));
+        sprintf(msg_s, "P,%d,%0.2f", (leader.player_num == LEAD_A)? LEAD_B:LEAD_A, (leader.energy / 100.0));
 
-        // // ask parent to pass ball
-        // if (leader.num_balls_team == 0) {
-        //     if (leader.player_num == LEAD_A)
-        //         kill(getppid(), SIGUSR1);
-        //     else
-        //         kill(getppid(), SIGUSR2);
-        // }  
+        // ask parent to pass ball
+        if (leader.num_balls_team == 0) {
+            if (leader.player_num == LEAD_A)
+                kill(getppid(), SIGUSR1);
+            else
+                kill(getppid(), SIGUSR2);
+        }  
     } else {
         kill(next_pid, SIGUSR1);
 
@@ -123,33 +115,20 @@ void pass_ball(int next_pid, int other_team_lead) {
 
         fflush(NULL);
 
-        sprintf(msg_s, "P,%d,%f", leader.player_num + 1, (leader.energy / 100.0));
+        sprintf(msg_s, "P,%d,%0.2f", leader.player_num + 1, (leader.energy / 100.0));
     }
 
-    write_fifo(msg_s);
+    write_fifo(msg_s, leader.fifo_name);
 
+    srand(time(NULL));
     leader.energy -= (rand() % 2) + 1;
 }
 
 
-void write_fifo(char* msg) {
-    int f = open(leader.fifo_name, O_RDONLY | O_NONBLOCK);
+void decrement_energy(int sig) {
+    srand(time(NULL));
 
-    if ((f = open(leader.fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
-        perror("Open Error\n");
-        exit(-1);
-    } else {
-        if ( write(f, msg, sizeof(msg)) == -1){
-            perror("Write Error\n");
-            exit(-1);
-        }
-    }
-    close(f);
-}
-
-
-void decrement_energy(int sig) {    
-    if (leader.energy > 50)
+    if (leader.energy > 30)
         leader.energy -= (rand() % 5) + 1;
 }
 
@@ -159,6 +138,7 @@ void reset(int sig) {
 
     write(leader.fd_pipe[1], message, sizeof(message));
 
-    init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team);
+    init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
     round_finished = true;
+    sleep(5);
 }

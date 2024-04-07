@@ -32,6 +32,9 @@ struct Player_vars {
 
 struct Ball {
     int player_id;
+    float colorR;
+    float colorG;
+    float colorB;
     int target_ball_position; // target position
     float current_ball_position[2]; // current position
 };

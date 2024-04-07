@@ -28,7 +28,7 @@ void set_signals(int signals[], void (*functionArray[])(int), int num_of_signals
     }
 }
 
-void init_vars(int* energy, int* num_balls_player, int* num_balls_team) {
+void init_vars(int* energy, int* num_balls_player, int* num_balls_team, char* fifo_name) {
     // initialize energy
     srand(getpid());
     *energy = (rand() % 31) + 70; // 70 - 100
@@ -37,6 +37,10 @@ void init_vars(int* energy, int* num_balls_player, int* num_balls_team) {
 
     if (num_balls_team)
         *num_balls_team = 0;
+    
+    char msg[BUFSIZ];
+    sprintf(msg, "E,%f", (*energy / 100.0));
+    write_fifo(msg, fifo_name);
 }
 
 // short pause
@@ -92,4 +96,19 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fif
     }
 
     return duration;
+}
+
+void write_fifo(char* msg, char* fifo_name) {
+    int f = open(fifo_name, O_RDONLY | O_NONBLOCK);
+
+    if ((f = open(fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
+        perror("Open Error\n");
+        exit(-1);
+    } else {
+        if ( write(f, msg, sizeof(msg)) == -1){
+            perror("Write Error\n");
+            exit(-1);
+        }
+    }
+    close(f);
 }
