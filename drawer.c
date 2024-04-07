@@ -16,6 +16,7 @@ char fifos[MAX_PLAYERS][100] = {
 };
 
 struct ball balls[30];
+
 int num_balls = 0;
 
 char msg_r[BUFSIZ];
@@ -167,18 +168,13 @@ void drawParent(float x, float y) {
 }
 
 int ball_index(int player) {
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < num_balls; i++) {
         if (balls[i].player_id == player)
             return i;
     }
-    return 0;
+    return -1;
 }
 
-// array of structs
-// struct: ballNumber, player (position), bool to_who (to other team or to next player)
-// Function to update the position of the ball
-// fifo A5 --> P,0 --> clean ball
-// fifo A5 --> D --> dropped ball
 void updateBallPosition() {
     // read from fifo
     int f;
@@ -202,7 +198,10 @@ void updateBallPosition() {
                     char* str = strtok('\0', ",");
 
                     int target = atoi(str); // target position // 2
-                    int ball_i = 0;
+                    int ball_i = ball_index(i);
+
+                    if (ball_i == -1)
+                        continue;
 
                     balls[ball_i].player_id = target;
                     balls[ball_i].target_ball_position = target;
@@ -221,18 +220,21 @@ void updateBallPosition() {
     }
 
 // Calculate the direction and distance to move
-    float dx = ballPositions[ balls[0].target_ball_position ][0] - balls[0].current_ball_position[0];
-    float dy = ballPositions[ balls[0].target_ball_position ][1] - balls[0].current_ball_position[1];
-    float distance = sqrt(dx * dx + dy * dy);
 
-    // Move the ball towards the target position
-    if (distance > ballSpeed) {
-        balls[0].current_ball_position[0] += (dx / distance) * ballSpeed;
-        balls[0].current_ball_position[1] += (dy / distance) * ballSpeed;
-    } else {
-        // If the distance is less than the speed, snap the ball to the target position
-        balls[0].current_ball_position[0] = ballPositions[ balls[0].target_ball_position ][0];
-        balls[0].current_ball_position[1] = ballPositions[ balls[0].target_ball_position ][1];
+    for (int i = 0; i < num_balls; i++) {
+        float dx = ballPositions[ balls[i].target_ball_position ][0] - balls[i].current_ball_position[0];
+        float dy = ballPositions[ balls[i].target_ball_position ][1] - balls[i].current_ball_position[1];
+        float distance = sqrt(dx * dx + dy * dy);
+
+        // Move the ball towards the target position
+        if (distance > ballSpeed) {
+            balls[i].current_ball_position[0] += (dx / distance) * ballSpeed;
+            balls[i].current_ball_position[1] += (dy / distance) * ballSpeed;
+        } else {
+            // If the distance is less than the speed, snap the ball to the target position
+            balls[i].current_ball_position[0] = ballPositions[ balls[i].target_ball_position ][0];
+            balls[i].current_ball_position[1] = ballPositions[ balls[i].target_ball_position ][1];
+        }
     }
 
     glutPostRedisplay(); // Request redisplay to continuously update the scene
@@ -298,22 +300,26 @@ void display() {
     // Draw the ball
     glColor3f(0.0f, 1.0f, 0.0f); // Set color to green
     drawCircle(balls[0].current_ball_position[0], balls[0].current_ball_position[1], 0.03f, 20); // Draw the ball at its position
+    
+    glColor3f(1.0f, 1.0f, 1.0f); // Set color to green
+    drawCircle(balls[1].current_ball_position[0], balls[1].current_ball_position[1], 0.03f, 20); // Draw the ball at its position
 
     glutSwapBuffers(); // Swap the front and back frame buffers (double buffering)
 }
 
 // Main function
 int main(int argc, char** argv) {
-    sleep(5);
     
     // balls with team leads
     // balls with Lead A
+    balls[num_balls].player_id = 0;
     balls[num_balls].target_ball_position = 0;
     balls[num_balls].current_ball_position[0] = ballPositions[LEAD_A][0];
     balls[num_balls].current_ball_position[1] = ballPositions[LEAD_A][1];
     num_balls++;
     
     // balls with Lead B
+    balls[num_balls].player_id = 6;
     balls[num_balls].target_ball_position = LEAD_B;
     balls[num_balls].current_ball_position[0] = ballPositions[LEAD_B][0];
     balls[num_balls].current_ball_position[1] = ballPositions[LEAD_B][1];

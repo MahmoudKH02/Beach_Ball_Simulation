@@ -4,6 +4,7 @@
 #define FIFO_PATH "/tmp/fifo"
 
 #define MAX_PLAYERS 12
+#define MAX_BALLS 30
 #define LEAD_A 0
 #define LEAD_B 6
 #define LAST_A 5
@@ -11,20 +12,6 @@
 
 static int MAX_ROUNDS;
 static int ROUND_TIME;
-
-// char *fifo1 = "/tmp/fifoA0";
-// char *fifo2 = "/tmp/fifoA1";
-// char *fifo3 = "/tmp/fifoA2";
-// char *fifo4 = "/tmp/fifoA3";
-// char *fifo5 = "/tmp/fifoA4";
-// char *fifo6 = "/tmp/fifoA5";
-// char *fifo7 = "/tmp/fifoB0";
-// char *fifo8 = "/tmp/fifoB1";
-// char *fifo9 = "/tmp/fifoB2";
-// char *fifo10 = "/tmp/fifoB3";
-// char *fifo11 = "/tmp/fifoB4";
-// char *fifo12 = "/tmp/fifoB5";
-
 
 struct teamlead_var {
     int energy;

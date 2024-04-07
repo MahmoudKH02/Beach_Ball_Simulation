@@ -99,6 +99,7 @@ int main(int argc, char *argv[]) {
         perror("Exec Drawer Failed!!\n");
         exit(SIGQUIT);
     }
+    sleep(5);
 
     // char msg_s[BUFSIZ];
 
@@ -172,7 +173,7 @@ int main(int argc, char *argv[]) {
 
     // send ball to team leads
     kill(pids[LEAD_A], SIGUSR2);
-    // kill(pids[LEAD_B], SIGUSR2);
+    kill(pids[LEAD_B], SIGUSR2);
 
     int sigs[3] = { SIGUSR1, SIGUSR2, SIGALRM };
     void (*functionArray[])(int) = { send_ball_teamA, send_ball_teamB, end_start_new_round };
@@ -352,7 +353,7 @@ bool game_finished(int teamA_wins, int teamB_wins) {
     } else if (round_finished) { // start new round
         sleep(1);
         kill(pids[LEAD_A], SIGUSR2);
-        // kill(pids[LEAD_B], SIGUSR2);
+        kill(pids[LEAD_B], SIGUSR2);
         alarm(ROUND_TIME);
         round_finished = false;
     }

@@ -7,7 +7,7 @@ void catch_ball_from_player(int);
 void catch_ball_from_teamlead (int);
 void decrement_energy(int);
 
-bool pass_to_next_team;
+bool pass_to_next_team[MAX_BALLS];
 bool round_finished;
 
 struct teamlead_var leader;
@@ -69,28 +69,36 @@ int main(int argc, char *argv[]) {
 
 
 void catch_ball_from_player(int sig) {
+    pass_to_next_team[leader.num_balls_player] = true;
     leader.num_balls_player++;
-    pass_to_next_team = true;
 }
 
 
 void catch_ball_from_teamlead(int sig) {
+    pass_to_next_team[leader.num_balls_player] = false;
     leader.num_balls_player++;
     leader.num_balls_team++;
-    pass_to_next_team = false;
     printf("Team Lead (%d) has %d balls in his hand, his team has %d balls\n", leader.player_num, leader.num_balls_player, leader.num_balls_team);
 }
 
 
 void pass_ball(int next_pid, int other_team_lead) {
-    if (pass_to_next_team) {
+    char msg_s[BUFSIZ];
+    leader.num_balls_player--;
+
+    if (pass_to_next_team[leader.num_balls_player]) {
         kill(other_team_lead, SIGUSR2);
         printf("teamlead (%d) passing ball to teamlead (%d)--Balls%d\n",
                 leader.player_num, (leader.player_num==LEAD_A)? LEAD_B:LEAD_A, leader.num_balls_team);
 
         fflush(NULL);
+        pass_to_next_team[leader.num_balls_player] = false;
         leader.num_balls_team--;
-        leader.num_balls_player--;
+
+        if (leader.player_num == LEAD_A)
+            sprintf(msg_s, "P,%d", LEAD_B);
+        else
+            sprintf(msg_s, "P,%d", LEAD_A);
 
         // // ask parent to pass ball
         // if (leader.num_balls_team == 0) {
@@ -110,10 +118,10 @@ void pass_ball(int next_pid, int other_team_lead) {
             printf("player (%d) passing ball to (%d), E=%d\n", leader.player_num, leader.player_num+1, leader.energy);
 
         fflush(NULL);
-        leader.num_balls_player--;
+
+        sprintf(msg_s, "P,%d", leader.player_num + 1);
     }
 
-    char msg_s[BUFSIZ];
 
     int f = open(leader.fifo_name, O_RDONLY | O_NONBLOCK);
 
@@ -121,28 +129,12 @@ void pass_ball(int next_pid, int other_team_lead) {
         perror("Open Error\n");
         exit(-1);
     } else {
-        if (leader.player_num == 0) {
-            if (pass_to_next_team)
-                sprintf(msg_s, "P,%d", LEAD_B);
-            else
-                sprintf(msg_s, "P,%d", leader.player_num + 1);
-        }
-        else {
-            if (pass_to_next_team)
-                sprintf(msg_s, "P,%d", LEAD_A);
-            else
-                sprintf(msg_s, "P,%d", leader.player_num + 1);
-
-        }
-
         if ( write(f, msg_s, sizeof(msg_s)) == -1){
             perror("Write Error\n");
             exit(-1);
         }
     }
     close(f);
-    pass_to_next_team = false;
-
 }
 
 
