@@ -95,8 +95,14 @@ void pass_ball(int next_pid) {
 
 
 void decrement_energy(int sig) {
+    srand(time(NULL));
+
     if (player.energy > 30)
         player.energy -= (rand() % 5) + 1;
+
+    // char msg[BUFSIZ];
+    // sprintf(msg, "E,%0.2f", (player.energy / 100.0));  
+    // write_fifo(msg, player.fifo_name);
 }
 
 void reset(int sig) {

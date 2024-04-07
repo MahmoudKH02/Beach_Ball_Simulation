@@ -130,6 +130,10 @@ void decrement_energy(int sig) {
 
     if (leader.energy > 30)
         leader.energy -= (rand() % 5) + 1;
+
+    // char msg[BUFSIZ];
+    // sprintf(msg, "E,%0.2f", (leader.energy / 100.0));
+    // write_fifo(msg, leader.fifo_name);
 }
 
 void reset(int sig) {

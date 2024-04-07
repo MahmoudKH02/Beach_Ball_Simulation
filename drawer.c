@@ -4,6 +4,8 @@ void send_ball_a(int sig);
 void send_ball_b(int sig);
 void end_round(int sig);
 
+void generate_random_color(int);
+
 char fifos[MAX_PLAYERS][100] = {
     "/tmp/fifoA0",
     "/tmp/fifoA1",
@@ -24,13 +26,15 @@ int fd_pipe[2];
 struct Ball balls[MAX_BALLS];
 
 int num_balls = 0;
+int wins_a = 0;
+int wins_b = 0;
 
 char msg_r[BUFSIZ];
 char last_winner[BUFSIZ];
 
 float energy_bars[MAX_PLAYERS];
 int players_balls[MAX_PLAYERS]; // balls with each player
-bool round_finished = false;
+float rgb[3];
 
 // Global variables for ball position and movement
 float ballX = -0.5f; // Initial x-coordinate of the ball (with the first team lead)
@@ -237,10 +241,6 @@ void read_fifo() {
         }
         close(f);
     }
-    for (int i = 0; i < num_balls; i++) {
-        printf("Ball (%d): current=%f, target=%d\n", i, balls[i].current_ball_position[0], balls[i].target_ball_position);
-        fflush(NULL);
-    }
 }
 
 void updateBallPosition() {
@@ -298,12 +298,20 @@ void display() {
     drawText(-0.63f, 0.60f, "Team Lead A");
     glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
     drawRectangleLine(-0.59f, 0.19f, 0.17f, 0.02f);
-    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+
+    // energy bars
+    if (energy_bars[LEAD_A] >= 0.8)
+        glColor3f(0.0f, 0.7f, 0.2f);
+    else if (energy_bars[LEAD_A] < 0.4)
+        glColor3f(1.0f, 0.05f, 0.0f);
+    else
+        glColor3f(1.0f, 0.647f, 0.0f);
+
     drawRectangle(-0.59f, 0.19f, 0.17f * energy_bars[0], 0.02f);
     // draw the energy level text
     sprintf(s, "E=%d", (int) (energy_bars[LEAD_A] * 100));
     glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
-    drawText(-0.5f, 0.35, s);
+    drawText(-0.55f, 0.14, s);
 
     // For team 2 (blue)
     drawTeamLead(0.5f, 0.4f, 0.0f, 0.0f, 1.0f); // Team lead 2
@@ -311,8 +319,20 @@ void display() {
     drawText(0.35f, 0.60f, "Team Lead B");
     glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
     drawRectangleLine(0.41f, 0.19f, 0.17f, 0.02f);
-    glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+
+    // energy bars
+    if (energy_bars[LEAD_B] >= 0.8)
+        glColor3f(0.0f, 0.7f, 0.2f);
+    else if (energy_bars[LEAD_B] < 0.4)
+        glColor3f(1.0f, 0.05f, 0.0f);
+    else
+        glColor3f(1.0f, 0.647f, 0.0f);
     drawRectangle(0.41f, 0.19f, 0.17f * energy_bars[6], 0.02f);
+
+    // draw the energy level text
+    sprintf(s, "E=%d", (int) (energy_bars[LEAD_B] * 100));
+    glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+    drawText(0.46f, 0.14, s);
 
     // Draw the children (players) for team 1
     for(int i = 0; i < 5; i++) {
@@ -325,7 +345,14 @@ void display() {
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(-0.93f + i * 0.18f, -0.3, 0.17, 0.02);
 
-        glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+        // energy bars
+        if (energy_bars[i] >= 0.8)
+            glColor3f(0.0f, 0.7f, 0.2f);
+        else if (energy_bars[i] <= 0.4)
+            glColor3f(1.0f, 0.05f, 0.0f);
+        else
+            glColor3f(1.0f, 0.647f, 0.0f);
+
         drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
 
         sprintf(s, "E=%d", (int) (energy_bars[i] * 100));
@@ -343,8 +370,15 @@ void display() {
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(0.06f + i * 0.18f, -0.3, 0.17, 0.02);
         
-        glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
-        drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
+        // energy bars
+        if (energy_bars[i+6] >= 0.8)
+            glColor3f(0.0f, 0.7f, 0.2f);
+        else if (energy_bars[i+6] <= 0.4)
+            glColor3f(1.0f, 0.05f, 0.0f);
+        else
+            glColor3f(1.0f, 0.647f, 0.0f);
+
+        drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i+6], 0.02f);
 
         sprintf(s, "E=%d", (int) (energy_bars[i+6] * 100));
         glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
@@ -358,11 +392,36 @@ void display() {
     // Draw the ball
     for (int i = 0; i < num_balls; i++) {
         glColor3f(balls[i].colorR, balls[i].colorG, balls[i].colorB); // Set color to green
-        float displacement = (players_balls[ balls[i].player_id ] - 1) * (0.03f * i);
+        float displacement = (players_balls[ balls[i].player_id ]) * (0.01f * (i%4));
         drawCircle(balls[i].current_ball_position[0], balls[i].current_ball_position[1] + displacement, 0.03f, 20); // Draw the ball at its position
     }
 
+    // draw the score
+    glColor3f(1.0, 1.0, 1.0f); // set color to orange
+    drawRectangleLine(0.32, 0.67, 0.35, 0.10);
+    drawRectangleLine(-0.68, 0.67, 0.35, 0.10);
+
+    glColor3f(0, 0.647f, 0.34f);
+    sprintf(s, "WINS: %d", wins_a);
+    drawText(-0.60, 0.70, s);
+
+    glColor3f(0, 0.647f, 0.34f);
+    sprintf(s, "WINS: %d", wins_b);
+    drawText(0.40, 0.70, s);
+
     glutSwapBuffers(); // Swap the front and back frame buffers (double buffering)
+}
+
+void generate_random_color(int ball_id) {
+    srand(ball_id + time(NULL));
+
+    int red = (rand() % 150);
+    int green = (rand() % 201) + 50;
+    int blue = (rand() % 56) + 50;
+
+    rgb[0] = (red / 255.0);
+    rgb[1] = (green / 255.0);
+    rgb[2] = (blue / 255.0); 
 }
 
 
@@ -386,9 +445,11 @@ int main(int argc, char** argv) {
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
     
-    balls[num_balls].colorR = 0.1;
-    balls[num_balls].colorG = 0.5;
-    balls[num_balls].colorB = 0.5;
+    generate_random_color(num_balls);
+
+    balls[num_balls].colorR = rgb[0];
+    balls[num_balls].colorG = rgb[1];
+    balls[num_balls].colorB = rgb[2];
     num_balls++;
     players_balls[LEAD_A] = 1;
     
@@ -398,9 +459,11 @@ int main(int argc, char** argv) {
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
 
-    balls[num_balls].colorR = 0.9;
-    balls[num_balls].colorG = 0;
-    balls[num_balls].colorB = 0.9;
+    generate_random_color(num_balls);
+
+    balls[num_balls].colorR = rgb[0];
+    balls[num_balls].colorG = rgb[1];
+    balls[num_balls].colorB = rgb[2];
 
     num_balls++;
     players_balls[LEAD_B] = 1;
@@ -446,9 +509,11 @@ void send_ball_a(int sig) {
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
 
-    balls[num_balls].colorR = 1;
-    balls[num_balls].colorG = 1;
-    balls[num_balls].colorB = 1;
+    generate_random_color(num_balls);
+
+    balls[num_balls].colorR = rgb[0];
+    balls[num_balls].colorG = rgb[1];
+    balls[num_balls].colorB = rgb[2];
     num_balls++;
 }
 
@@ -459,9 +524,11 @@ void send_ball_b(int sig) {
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
 
-    balls[num_balls].colorR = 1;
-    balls[num_balls].colorG = 1;
-    balls[num_balls].colorB = 1;
+    generate_random_color(num_balls);
+
+    balls[num_balls].colorR = rgb[0];
+    balls[num_balls].colorG = rgb[1];
+    balls[num_balls].colorB = rgb[2];
     num_balls++;
 }
 
@@ -487,6 +554,8 @@ void end_round(int sig) {
 
     read(fd_pipe[0], last_winner, sizeof(last_winner));
 
-    round_finished = true;
+    if (strcmp(last_winner, "Team A") == 0)
+        wins_a++;
+    else if (strcmp(last_winner, "Team B") == 0)
+        wins_b++;
 }
-

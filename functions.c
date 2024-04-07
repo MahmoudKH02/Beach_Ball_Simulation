@@ -50,15 +50,15 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fif
     int duration;
 
     if (energy <= 100 && energy > 90)
-        duration = (rand() % 2) + 1;
+        duration = (rand() % 3) + 3; // 3-5
     else if (energy <= 90 && energy > 80)
-        duration = (rand() % 3) + 2;
+        duration = (rand() % 3) + 5; // 5-7
     else if (energy <= 80 && energy > 70)
-        duration = (rand() % 3) + 4;
+        duration = (rand() % 3) + 7; // 7-9
     else if (energy <= 70 && energy > 60)
-        duration = (rand() % 3) + 6;
+        duration = (rand() % 3) + 9; // 9-11
     else
-        duration = (rand() % 3) + 8;
+        duration = (rand() % 3) + 11; // 11-13
 
     // calculate drop probability
     int drop_proba;
