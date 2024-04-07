@@ -15,11 +15,13 @@ char fifos[MAX_PLAYERS][100] = {
     "/tmp/fifoB5"
 };
 
-struct ball balls[30];
+struct Ball balls[30];
 
 int num_balls = 0;
 
 char msg_r[BUFSIZ];
+
+float energy_bars[12];
 
 // Global variables for ball position and movement
 float ballX = -0.5f; // Initial x-coordinate of the ball (with the first team lead)
@@ -39,6 +41,7 @@ float ballPositions[][2] = {
     {0.51f, -0.1f},   // Horizontal movement to third player of team B
     {0.69f, -0.1f},   // Horizontal movement to fourth player of team B
     {0.87f, -0.1f},   // Horizontal movement to fifth player of team B
+    {-0.0f, 0.75f},   // position of parent
 };
 
 int currentBallPositionIndex = 0; // Index of the current position in the sequence
@@ -175,7 +178,7 @@ int ball_index(int player) {
     return -1;
 }
 
-void updateBallPosition() {
+void read_fifo() {
     // read from fifo
     int f;
     int bytes;
@@ -192,12 +195,18 @@ void updateBallPosition() {
                 exit(-1);
             } else if (bytes > 0) {   
                 // update struct
+                printf("str: %s\n", msg_r);
                 strtok(msg_r, ",");
-                
-                if (strcmp(msg_r, "P") == 0) { // pass ball
-                    char* str = strtok('\0', ",");
+                fflush(NULL);
 
-                    int target = atoi(str); // target position // 2
+                if (strcmp(msg_r, "P") == 0) { 
+                    char* string = strtok('\0', ",");
+                    int target = atoi(string); // target position
+                    printf("target (%d): %d\n", i, target);
+
+                    char* strEnergy = strtok('\0', "\n");
+                    energy_bars[i] = atof(strEnergy);
+
                     int ball_i = ball_index(i);
 
                     if (ball_i == -1)
@@ -208,18 +217,25 @@ void updateBallPosition() {
 
                 } else if (strcmp(msg_r, "D") == 0) {
                     // change color...
+
+                } else if (strcmp(msg_r, "E") == 0) {
+                    char* str = strtok('\0', ","); // energy lvl
+                    energy_bars[i] = atof(str);
                 }
             }
         }
         close(f);
     }
-
     for (int i = 0; i < num_balls; i++) {
         printf("Ball (%d): current=%f, target=%d\n", i, balls[i].current_ball_position[0], balls[i].target_ball_position);
         fflush(NULL);
     }
+}
 
+void updateBallPosition() {
 // Calculate the direction and distance to move
+
+    read_fifo();
 
     for (int i = 0; i < num_balls; i++) {
         float dx = ballPositions[ balls[i].target_ball_position ][0] - balls[i].current_ball_position[0];
@@ -283,6 +299,10 @@ void display() {
 		drawText(-0.88f + i * 0.18f, 0.06, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(-0.93f + i * 0.18f, -0.3, 0.17, 0.02);
+
+        glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+        drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
+        // drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f, 0.02f);
     }
 
     // Draw the children (players) for team 2
@@ -294,7 +314,12 @@ void display() {
 		drawText(0.13f + i * 0.18f, 0.06, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(0.06f + i * 0.18f, -0.3, 0.17, 0.02);
+        
+        glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
+        drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
+        // drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f, 0.02f);
     }
+
 
 
     // Draw the ball
@@ -309,20 +334,22 @@ void display() {
 
 // Main function
 int main(int argc, char** argv) {
+    sleep(1);
+    read_fifo();
     
     // balls with team leads
     // balls with Lead A
     balls[num_balls].player_id = 0;
-    balls[num_balls].target_ball_position = 0;
-    balls[num_balls].current_ball_position[0] = ballPositions[LEAD_A][0];
-    balls[num_balls].current_ball_position[1] = ballPositions[LEAD_A][1];
+    balls[num_balls].target_ball_position = LEAD_A;
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
     num_balls++;
     
     // balls with Lead B
     balls[num_balls].player_id = 6;
     balls[num_balls].target_ball_position = LEAD_B;
-    balls[num_balls].current_ball_position[0] = ballPositions[LEAD_B][0];
-    balls[num_balls].current_ball_position[1] = ballPositions[LEAD_B][1];
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
     num_balls++;
 
 

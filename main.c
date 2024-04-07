@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         perror("Exec Drawer Failed!!\n");
         exit(SIGQUIT);
     }
-    sleep(5);
+    sleep(10);
 
     // char msg_s[BUFSIZ];
 

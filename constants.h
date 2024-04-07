@@ -13,23 +13,24 @@
 static int MAX_ROUNDS;
 static int ROUND_TIME;
 
-struct teamlead_var {
+struct Teamlead_var {
     int energy;
     int fd_pipe[2];
     char fifo_name[100];
     int player_num;
     int num_balls_team;
     int num_balls_player;
+    bool pass_to_next_team[MAX_BALLS];
 };
 
-struct player_vars {
+struct Player_vars {
     int energy;
     char fifo_name[100];
     int player_num;
     int num_balls_player;
 };
 
-struct ball {
+struct Ball {
     int player_id;
     int target_ball_position; // target position
     float current_ball_position[2]; // current position

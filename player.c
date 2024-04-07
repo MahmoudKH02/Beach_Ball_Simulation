@@ -1,6 +1,7 @@
 #include "headers.h"
 
 void pass_ball(int);
+void write_fifo(char* msg);
 
 void catch_ball(int);
 void decrement_energy(int);
@@ -8,10 +9,8 @@ void reset(int);
 
 bool round_finished;
 
-struct player_vars player;
+struct Player_vars player;
 
-char msg_r[BUFSIZ] = "";
-char *fifo = "/tmp/fifoA0";
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
@@ -36,31 +35,11 @@ int main(int argc, char *argv[]) {
 
     init_vars(&player.energy, &player.num_balls_player, NULL);
 
-    // if (player.player_num == 1) {
-
-    //     char msg_s[BUFSIZ];
-
-    //     int f = open(player.fifo_name, O_RDONLY | O_NONBLOCK);
-    //     printf("Child (%d) fifoName: %s\n", player.player_num, player.fifo_name);
-
-    //     if ((f = open(player.fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
-    //         perror("Open Error\n");
-    //         exit(-1);
-    //     } else {
-
-    //         strcpy(msg_s, "Find 5*5");
-    //         if ( write(f, msg_s, sizeof(msg_s)) == -1){
-    //             perror("Write Error\n");
-    //             exit(-1);
-    //         }
-    //     }
-
-    //     close(f);
-    //     sleep(15);
-    // }
-
-    // sleep(20);
-
+    char msg[BUFSIZ];
+    sprintf(msg, "E,%f", (player.energy / 100.0));
+    write_fifo(msg);
+    printf("Energy Child (%d): %d\n", player.player_num, player.energy);
+    fflush(NULL);
 
     while (1) {
         alarm(19);
@@ -111,21 +90,26 @@ void pass_ball(int next_pid) {
     fflush(NULL);
     player.num_balls_player--;
 
-
     char msg_s[BUFSIZ];
 
+    if (player.player_num < 6)
+        sprintf(msg_s, "P,%d,%f", (player.player_num + 1) % 6, (player.energy / 100.0));
+    else
+        sprintf(msg_s, "P,%d,%f", ((player.player_num + 1) % 6) + 6, (player.energy / 100.0));
+
+    write_fifo(msg_s);
+
+    player.energy -= (rand() % 2) + 1;
+}
+
+void write_fifo(char* msg) {
     int f = open(player.fifo_name, O_RDONLY | O_NONBLOCK);
 
     if ((f = open(player.fifo_name, O_WRONLY | O_NONBLOCK)) == -1){
         perror("Open Error\n");
         exit(-1);
     } else {
-        if (player.player_num < 6)
-            sprintf(msg_s, "P,%d", (player.player_num + 1) % 6);
-        else
-            sprintf(msg_s, "P,%d", ((player.player_num + 1) % 6) + 6);
-
-        if ( write(f, msg_s, sizeof(msg_s)) == -1){
+        if ( write(f, msg, sizeof(msg)) == -1){
             perror("Write Error\n");
             exit(-1);
         }
