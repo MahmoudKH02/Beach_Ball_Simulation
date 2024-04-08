@@ -1,4 +1,4 @@
 #!/bin/sh
 make
 
-./main
+./main "settings.txt"

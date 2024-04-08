@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     char* fifos[MAX_PLAYERS];
 
     // read game settings
-    readFile("settings.txt");
+    readFile(argv[1]);
     printf("value: %d, %d\n", MAX_ROUNDS, ROUND_TIME);
 
 
@@ -104,16 +104,16 @@ int main(int argc, char *argv[]) {
     if (drawer_pid == 0) {
         char r_pipe[20];
         char w_pipe[20];
+        char r_time[20];
 
         sprintf(r_pipe, "%d", drawer_pipe[0]);
         sprintf(w_pipe, "%d", drawer_pipe[1]);
+        sprintf(r_time, "%d", ROUND_TIME);
 
-        execlp("./drawer", "drawer", r_pipe, w_pipe, NULL);
+        execlp("./drawer", "drawer", r_pipe, w_pipe, r_time, NULL);
         perror("Exec Drawer Failed!!\n");
         exit(SIGQUIT);
     }
-    sleep(10);
-
 
     // Parent process
     for ( i = 0; i < MAX_PLAYERS; i++ ) {
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
         write(fd[i][1], buffer, sizeof(buffer));
     }
 
-    sleep(1);
+    sleep(3);
 
     // send ball to team leads
     kill(pids[LEAD_A], SIGUSR2);
@@ -164,9 +164,9 @@ int main(int argc, char *argv[]) {
     char* winner;
 
     // parent waiting for events from children
+    // <<<<-------------------------------------------------------------------------------->>>>
     do {
         pause();
-
 
         // check who won
         if (round_finished) {
@@ -191,6 +191,9 @@ int main(int argc, char *argv[]) {
         close(fd[i][0]);
         close(fd[i][1]);
     }
+
+    int status;
+    waitpid(drawer_pid, &status, 0);
 
     // remove the fifos
     for (i = 0; i < MAX_PLAYERS; i++)
@@ -217,13 +220,14 @@ void send_ball_teamB(int sig) {
 }
 
 // alarm signal
-void end_start_new_round(int signum){
+void end_start_new_round(int signum) {
     // reset all children
     for (int i = 0; i < MAX_PLAYERS; i++) {
         kill(pids[i], SIGRTMIN);
     }
     current_round++;
     round_finished = true;
+    sleep(2);
 }
 
 
@@ -311,6 +315,7 @@ bool game_finished(int teamA_wins, int teamB_wins, char* last_round_result) {
         for (int i = 0; i < MAX_PLAYERS; i++) {
             kill(pids[i], SIGINT);
         }
+        kill(drawer_pid, SIGINT);
 
         printf("Team A has %d wins\n", teamA_wins);
         printf("Team B has %d wins\n", teamB_wins);
@@ -326,17 +331,17 @@ bool game_finished(int teamA_wins, int teamB_wins, char* last_round_result) {
         return true;
 
     } else if (round_finished) { // start new round
-        kill(pids[LEAD_A], SIGUSR2);
-        kill(pids[LEAD_B], SIGUSR2);
-
+        kill(drawer_pid, SIGRTMIN);
         // write result to drawer
         char msg[BUFSIZ];
         sprintf(msg ,"%s", last_round_result);
         write(drawer_pipe[1], msg, sizeof(msg));
 
-        kill(drawer_pid, SIGRTMIN);
-        sleep(8);
+        kill(pids[LEAD_A], SIGUSR2);
+        kill(pids[LEAD_B], SIGUSR2);
+
         alarm(ROUND_TIME);
+        // sleep(8);
         round_finished = false;
     }
     return false;

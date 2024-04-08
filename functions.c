@@ -30,7 +30,7 @@ void set_signals(int signals[], void (*functionArray[])(int), int num_of_signals
 
 void init_vars(int* energy, int* num_balls_player, int* num_balls_team, char* fifo_name) {
     // initialize energy
-    srand(getpid());
+    srand(time(NULL) + getpid());
     *energy = (rand() % 31) + 70; // 70 - 100
 
     *num_balls_player = 0;

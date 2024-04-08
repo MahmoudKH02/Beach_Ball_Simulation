@@ -43,6 +43,7 @@ struct GUIPlayer {
     struct Queue* balls_queue; // index of ball
     bool dropped_ball;
     float energy_bar;
+    int num_balls;
 };
 
 struct Queue {

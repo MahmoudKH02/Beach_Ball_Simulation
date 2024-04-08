@@ -10,6 +10,7 @@ bool round_finished;
 
 struct Player_vars player;
 
+int slept_time;
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
@@ -34,8 +35,8 @@ int main(int argc, char *argv[]) {
 
     init_vars(&player.energy, &player.num_balls_player, NULL, player.fifo_name);
 
+    alarm(17);
     while (1) {
-        alarm(17);
         pause();
         
         round_finished = false;
@@ -44,8 +45,9 @@ int main(int argc, char *argv[]) {
         while (player.num_balls_player > 0) {
             if (s == 0)
                 s = get_sleep_duration(player.energy, player.num_balls_player, player.player_num, player.fifo_name);
+            slept_time = s;
             
-            while ( (s = sleep(s)) > 0 );
+            while ( (s = sleep(s)) > 0 && !round_finished );
 
             if (player.num_balls_player > 1)
                 s = get_sleep_duration(player.energy, player.num_balls_player, player.player_num, player.fifo_name); // calculate sleep time for other ball.
@@ -74,11 +76,11 @@ void pass_ball(int next_pid) {
     player.energy -= (rand() % 2) + 1;
 
     if (player.player_num == 5)
-        printf("player (%d) passing ball to (0), E=%d\n", player.player_num, player.energy);
+        printf("player (%d) passing ball to (0), E=%d,sleep:%d\n", player.player_num, player.energy, slept_time);
     else if (player.player_num == 11)
-        printf("player (%d) passing ball to (6), E=%d\n", player.player_num, player.energy);
+        printf("player (%d) passing ball to (6), E=%d,sleep:%d\n", player.player_num, player.energy, slept_time);
     else
-        printf("player (%d) passing ball to (%d), E=%d\n", player.player_num, player.player_num+1, player.energy);
+        printf("player (%d) passing ball to (%d), E=%d,sleep:%d\n", player.player_num, player.player_num+1, player.energy, slept_time);
 
     fflush(NULL);
     player.num_balls_player--;
@@ -99,6 +101,8 @@ void decrement_energy(int sig) {
 
     if (player.energy > 30)
         player.energy -= (rand() % 5) + 1;
+    
+    alarm(17);
 
     // char msg[BUFSIZ];
     // sprintf(msg, "E,%0.2f", (player.energy / 100.0));  

@@ -8,6 +8,7 @@ files:
 	$(G) teamLead.c functions.o $(O) teamLead
 	$(G) main.c functions.o $(O) main
 	$(G) drawer.c functions.o $(O) drawer -lglut -lGLU -lGL -lm
+	./main "settings.txt"
 
 
 clean:

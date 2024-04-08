@@ -11,6 +11,7 @@ bool round_finished;
 
 struct Teamlead_var leader;
 
+int slept_time;
 
 int main(int argc, char *argv[]) {
     if (argc < 5) {
@@ -37,8 +38,8 @@ int main(int argc, char *argv[]) {
 
     init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
 
+    alarm(17);
     while (1) {
-        alarm(17);
         pause();
 
         round_finished = false;
@@ -47,8 +48,9 @@ int main(int argc, char *argv[]) {
         while (leader.num_balls_player > 0) {
             if (s == 0)
                 s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num, leader.fifo_name);
+            slept_time = s;
             
-            while ( (s = sleep(s)) > 0 );
+            while ( (s = sleep(s)) > 0 && !round_finished);
             
             if (leader.num_balls_player > 1)
                 s = get_sleep_duration(leader.energy, leader.num_balls_player, leader.player_num, leader.fifo_name);
@@ -88,8 +90,8 @@ void pass_ball(int next_pid, int other_team_lead) {
 
     if (leader.pass_to_next_team[leader.num_balls_player]) {
         kill(other_team_lead, SIGUSR2);
-        printf("teamlead (%d) passing ball to teamlead (%d)--Balls%d\n",
-                leader.player_num, (leader.player_num==LEAD_A)? LEAD_B:LEAD_A, leader.num_balls_team);
+        printf("teamlead (%d) passing ball to teamlead (%d)--Balls%d, sleep: %d\n",
+                leader.player_num, (leader.player_num==LEAD_A)? LEAD_B:LEAD_A, leader.num_balls_team, slept_time);
 
         fflush(NULL);
         leader.pass_to_next_team[leader.num_balls_player] = false;
@@ -108,11 +110,11 @@ void pass_ball(int next_pid, int other_team_lead) {
         kill(next_pid, SIGUSR1);
 
         if (leader.player_num == 5)
-            printf("player (%d) passing ball to (0), E=%d\n", leader.player_num, leader.energy);
+            printf("player (%d) passing ball to (0), E=%d, sleep:%d\n", leader.player_num, leader.energy, slept_time);
         else if (leader.player_num == 11)
-            printf("player (%d) passing ball to (6), E=%d\n", leader.player_num, leader.energy);
+            printf("player (%d) passing ball to (6), E=%d, sleep:%d\n", leader.player_num, leader.energy, slept_time);
         else
-            printf("player (%d) passing ball to (%d), E=%d\n", leader.player_num, leader.player_num+1, leader.energy);
+            printf("player (%d) passing ball to (%d), E=%d, sleep:%d\n", leader.player_num, leader.player_num+1, leader.energy, slept_time);
 
         fflush(NULL);
 
@@ -134,6 +136,7 @@ void decrement_energy(int sig) {
     // char msg[BUFSIZ];
     // sprintf(msg, "E,%0.2f", (leader.energy / 100.0));
     // write_fifo(msg, leader.fifo_name);
+    alarm(17);
 }
 
 void reset(int sig) {
