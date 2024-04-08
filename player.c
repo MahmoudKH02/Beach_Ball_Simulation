@@ -103,10 +103,6 @@ void decrement_energy(int sig) {
         player.energy -= (rand() % 5) + 1;
     
     alarm(17);
-
-    // char msg[BUFSIZ];
-    // sprintf(msg, "E,%0.2f", (player.energy / 100.0));  
-    // write_fifo(msg, player.fifo_name);
 }
 
 void reset(int sig) {

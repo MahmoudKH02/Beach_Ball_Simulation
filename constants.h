@@ -20,7 +20,7 @@ struct Teamlead_var {
     int player_num;
     int num_balls_team;
     int num_balls_player;
-    bool pass_to_next_team[MAX_BALLS];
+    struct Queue* pass_to_next_team;
 };
 
 struct Player_vars {

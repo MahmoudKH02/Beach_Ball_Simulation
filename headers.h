@@ -53,6 +53,7 @@ int dequeue(struct Queue* q);
 void display_queue(struct Queue* q);
 int get_queue_size(struct Queue* q);
 bool is_empty_queue(struct Queue* q);
+void clear_queue(struct Queue* q);
 void delete_queue(struct Queue* q);
 
 

@@ -130,10 +130,8 @@ struct Queue* create_queue(struct Queue* q) {
         q->max_size = 20;
         q->head = 0;
         q->tail = 0;
-
-        return q;
     }
-    return NULL;
+    return q;
 }
 
 void enqueue(struct Queue* q, int data) {
@@ -167,6 +165,11 @@ int get_queue_size(struct Queue* q) {
 
 bool is_empty_queue(struct Queue* q) {
     return abs(q->tail - q->head) == 0;
+}
+
+void clear_queue(struct Queue* q) {
+    q->head = 0;
+    q->tail = 0;
 }
 
 void delete_queue(struct Queue* q) {

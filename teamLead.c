@@ -37,8 +37,13 @@ int main(int argc, char *argv[]) {
     set_signals(sigArr, functionArray, 4);
 
     init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
+    
+    leader.pass_to_next_team = NULL;
+    leader.pass_to_next_team = create_queue(leader.pass_to_next_team);
+
 
     alarm(17);
+
     while (1) {
         pause();
 
@@ -64,19 +69,22 @@ int main(int argc, char *argv[]) {
 
     close(leader.fd_pipe[0]);
     close(leader.fd_pipe[1]);
+    delete_queue(leader.pass_to_next_team);
 
     return 0;
 }
 
 
 void catch_ball_from_player(int sig) {
-    leader.pass_to_next_team[leader.num_balls_player] = true;
+    enqueue(leader.pass_to_next_team, true);
+    // leader.pass_to_next_team[leader.num_balls_player] = true;
     leader.num_balls_player++;
 }
 
 
 void catch_ball_from_teamlead(int sig) {
-    leader.pass_to_next_team[leader.num_balls_player] = false;
+    enqueue(leader.pass_to_next_team, false);
+    // leader.pass_to_next_team[leader.num_balls_player] = false;
     leader.num_balls_player++;
     leader.num_balls_team++;
     printf("Team Lead (%d) has %d balls in his hand, his team has %d balls\n", leader.player_num, leader.num_balls_player, leader.num_balls_team);
@@ -88,13 +96,13 @@ void pass_ball(int next_pid, int other_team_lead) {
     leader.energy -= (rand() % 2) + 1;
     char msg_s[BUFSIZ];
 
-    if (leader.pass_to_next_team[leader.num_balls_player]) {
+    // if (leader.pass_to_next_team[leader.num_balls_player]) {
+    if ( dequeue(leader.pass_to_next_team) ) {
         kill(other_team_lead, SIGUSR2);
         printf("teamlead (%d) passing ball to teamlead (%d)--Balls%d, sleep: %d\n",
                 leader.player_num, (leader.player_num==LEAD_A)? LEAD_B:LEAD_A, leader.num_balls_team, slept_time);
 
         fflush(NULL);
-        leader.pass_to_next_team[leader.num_balls_player] = false;
         leader.num_balls_team--;
 
         sprintf(msg_s, "P,%d,%d", (leader.player_num == LEAD_A)? LEAD_B:LEAD_A, leader.energy);
@@ -133,9 +141,6 @@ void decrement_energy(int sig) {
     if (leader.energy > 30)
         leader.energy -= (rand() % 5) + 1;
 
-    // char msg[BUFSIZ];
-    // sprintf(msg, "E,%0.2f", (leader.energy / 100.0));
-    // write_fifo(msg, leader.fifo_name);
     alarm(17);
 }
 
@@ -146,6 +151,9 @@ void reset(int sig) {
     write(leader.fd_pipe[1], message, sizeof(message));
 
     init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
+
+    clear_queue(leader.pass_to_next_team);
+
     round_finished = true;
     sleep(3);
 }

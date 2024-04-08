@@ -43,7 +43,7 @@ float rgb[3];
 // Global variables for ball position and movement
 float ballX = -0.5f; // Initial x-coordinate of the ball (with the first team lead)
 float ballY = 0.4f;  // Initial y-coordinate of the ball (with the first team lead)
-float ballSpeed = 0.5f; // Speed of the ball
+float ballSpeed = 0.09f; // Speed of the ball
 
 float ballPositions[][2] = {
     {-0.5f, 0.4f},    // Starting position with team lead A
@@ -125,11 +125,19 @@ void drawPlayer(float x, float y, float colorR, float colorG, float colorB) {
     // Draw arms
     glBegin(GL_LINES);
     glVertex2f(x, y + 0.01f); // Arms' upper point
-    glVertex2f(x - 0.05f, y - 0.05f); // Left arm's lower point
+    
+    if(game_ended)
+        glVertex2f(x - 0.05f, y + 0.05f); // Left arm's lower point
+    else
+        glVertex2f(x - 0.05f, y - 0.05f); // Left arm's lower point
+    
     glEnd();
     glBegin(GL_LINES);
     glVertex2f(x, y + 0.01f); // Arms' upper point
-    glVertex2f(x + 0.05f, y - 0.05f); // Right arm's lower point
+    if(game_ended)
+        glVertex2f(x + 0.05f, y + 0.05f); // Right arm's lower point
+    else 
+        glVertex2f(x + 0.05f, y - 0.05f); // Right arm's lower point
     glEnd();
 
     // Draw legs
@@ -175,11 +183,18 @@ void drawParent(float x, float y) {
     // Draw arms
     glBegin(GL_LINES);
     glVertex2f(x, y - 0.05f); // Arms' upper point
-    glVertex2f(x + 0.05f, y - 0.15f); // Left arm's lower point
+    
+    if(game_ended)
+        glVertex2f(x + 0.06f, y + 0.05f); // Left arm's lower point
+    else
+        glVertex2f(x + 0.05f, y - 0.15f); // Left arm's lower point
     glEnd();
     glBegin(GL_LINES);
     glVertex2f(x, y - 0.05f); // Arms' upper point
-    glVertex2f(x - 0.05f, y - 0.15f); // Right arm's lower point
+    if(game_ended)
+        glVertex2f(x - 0.06f, y + 0.05f); // Right arm's lower point
+    else 
+        glVertex2f(x - 0.05f, y - 0.15f); // Right arm's lower point
     glEnd();
 
     // Draw legs
@@ -196,10 +211,6 @@ void drawParent(float x, float y) {
 int ball_index(int player) {
     if (!is_empty_queue(all_players[player].balls_queue))
         return dequeue(all_players[player].balls_queue);
-    // for (int i = 0; i < MAX_PLAYERS; i++) {
-    //     if (balls[i].player_id == player)
-    //         return i;
-    // }
     return -1;
 }
 
@@ -238,8 +249,9 @@ void read_fifo() {
                     balls[ball_i].player_id = target;
                     balls[ball_i].target_ball_position = target;
                     all_players[target].num_balls++;
-                    all_players[i].num_balls--;
 
+                    if (all_players[i].num_balls > 0)
+                        all_players[i].num_balls--;
 
                 } else if (strcmp(msg_r, "D") == 0) {
                     all_players[i].dropped_ball = true;
@@ -301,6 +313,7 @@ void display() {
 	drawText(-0.12f, 0.9f, "The Parent");
 
     char s[BUFSIZ + 200];
+    char s1[BUFSIZ + 200];
 
     // Draw the team leads
     // For team 1 (red)
@@ -330,6 +343,10 @@ void display() {
     glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
     drawText(-0.55f, 0.14, s);
 
+    sprintf(s, "Balls:%d", (int) (all_players[0].num_balls));
+    glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+	drawText(-0.56f, 0.09, s);
+
     // For team 2 (blue)
     drawTeamLead(0.5f, 0.4f, 0.0f, 0.0f, 1.0f); // Team lead 2
 
@@ -357,6 +374,10 @@ void display() {
     glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
     drawText(0.46f, 0.14, s);
 
+    sprintf(s, "Balls:%d", (int) (all_players[6].num_balls));
+    glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+	drawText(0.45f, 0.09, s);
+
     // Draw the children (players) for team 1
     for(int i = 0; i < 5; i++) {
         drawPlayer(-0.85f + i * 0.18f, -0.1, 1.0f, 0.0f, 0.0f); // Team 1 players (red)
@@ -370,7 +391,7 @@ void display() {
 		    glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow
 
 		sprintf(s, "P%d", i+1);
-		drawText(-0.88f + i * 0.18f, 0.06, s);
+		drawText(-0.88f + i * 0.18f, 0.03, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(-0.93f + i * 0.18f, -0.3, 0.17, 0.02);
 
@@ -387,6 +408,10 @@ void display() {
         sprintf(s, "E=%d", (int) (all_players[i+1].energy_bar * 100));
         glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
 		drawText(-0.9f + i * 0.18f, -0.35, s);
+
+        sprintf(s, "Balls:%d", (int) (all_players[i+1].num_balls));
+        glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+		drawText(-0.91f + i * 0.18f, -0.4, s);
     }
 
     // Draw the children (players) for team 2
@@ -400,7 +425,7 @@ void display() {
 		    glColor3f(1.0f, 1.0f, 0.0f); // Set color to yellow // Set color to yellow
 
 		sprintf(s, "P%d", i+1);
-		drawText(0.13f + i * 0.18f, 0.06, s);
+		drawText(0.13f + i * 0.18f, 0.03, s);
 		glColor3f(1.0f, 0.647f, 0.0f); // set color to orange
 		drawRectangleLine(0.06f + i * 0.18f, -0.3, 0.17, 0.02);
         
@@ -417,17 +442,31 @@ void display() {
         sprintf(s, "E=%d", (int) (all_players[i+7].energy_bar * 100));
         glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
 		drawText(0.09f + i * 0.18f, -0.35, s);
+
+        sprintf(s, "Balls:%d", (int) (all_players[i+7].num_balls));
+        glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
+		drawText(0.08f + i * 0.18f, -0.4, s);
     }
 
     glColor3f(0, 0.647f, 0.34f); // set color to green
 
     if (game_ended) {
-        if (wins_a > wins_b)
+
+        if (wins_a > wins_b){
+            sprintf(s1, "The Game ended");
+            drawText(-0.23f, -0.53f, s1);
             sprintf(s, "The Winner is: Team A");
-        else if (wins_b > wins_a)
+        }
+        else if (wins_b > wins_a){
+            sprintf(s1, "The Game ended");
+            drawText(-0.23f, -0.53f, s1);
             sprintf(s, "The Winner is: Team B");
-        else
+        }
+        else{
+            sprintf(s1, "The Game ended");
+            drawText(-0.23f, -0.53f, s1);
             sprintf(s, "No Team Won, its a tie");
+        }
     } else {
         sprintf(s, "Last Round Winner: %s", last_winner);
     }
@@ -476,7 +515,7 @@ void generate_random_color(int ball_id) {
 
     rgb[0] = (red / 255.0);
     rgb[1] = (green / 255.0);
-    rgb[2] = (blue / 255.0); 
+    rgb[2] = (blue / 255.0);
 }
 
 void init_players() {
@@ -589,7 +628,7 @@ int main(int argc, char** argv) {
     glutIdleFunc(updateBallPosition); // Register the update function
 
     // Start the countdown timer
-    // glutTimerFunc(0, updateTimer, 0);
+    glutTimerFunc(0, updateTimer, 0);
 
     glutMainLoop(); // Enter the GLUT event processing loop
     
@@ -611,6 +650,7 @@ void send_ball_a(int sig) {
     balls[num_balls].colorG = rgb[1];
     balls[num_balls].colorB = rgb[2];
     enqueue(all_players[LEAD_A].balls_queue, num_balls);
+    all_players[LEAD_A].num_balls++;
     
     num_balls++;
 }
@@ -629,6 +669,7 @@ void send_ball_b(int sig) {
     balls[num_balls].colorB = rgb[2];
 
     enqueue(all_players[LEAD_B].balls_queue, num_balls);
+    all_players[LEAD_B].num_balls++;
 
     num_balls++;
 }
