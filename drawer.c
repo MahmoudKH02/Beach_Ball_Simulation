@@ -24,6 +24,7 @@ char fifos[MAX_PLAYERS][100] = {
 int fd_pipe[2];
 
 struct Ball balls[MAX_BALLS];
+struct GUIPlayer all_players[MAX_PLAYERS];
 
 int num_balls = 0;
 int wins_a = 0;
@@ -56,8 +57,6 @@ float ballPositions[][2] = {
     {0.87f, -0.1f},   // Horizontal movement to fifth player of team B
     {-0.0f, 0.75f},   // position of parent
 };
-
-int currentBallPositionIndex = 0; // Index of the current position in the sequence
 
 // Function to initialize the OpenGL environment
 void initialize() {
@@ -108,18 +107,18 @@ void drawPlayer(float x, float y, float colorR, float colorG, float colorB) {
 
     // Draw body
     glBegin(GL_LINES);
-    glVertex2f(x, y); // Body's upper point
+    glVertex2f(x, y + 0.1); // Body's upper point
     glVertex2f(x, y - 0.1f); // Body's lower point
     glEnd();
 
     // Draw arms
     glBegin(GL_LINES);
-    glVertex2f(x, y - 0.05f); // Arms' upper point
-    glVertex2f(x - 0.05f, y - 0.1f); // Left arm's lower point
+    glVertex2f(x, y + 0.01f); // Arms' upper point
+    glVertex2f(x - 0.05f, y - 0.05f); // Left arm's lower point
     glEnd();
     glBegin(GL_LINES);
-    glVertex2f(x, y - 0.05f); // Arms' upper point
-    glVertex2f(x + 0.05f, y - 0.1f); // Right arm's lower point
+    glVertex2f(x, y + 0.01f); // Arms' upper point
+    glVertex2f(x + 0.05f, y - 0.05f); // Right arm's lower point
     glEnd();
 
     // Draw legs
@@ -158,36 +157,38 @@ void drawParent(float x, float y) {
 
     // Draw body
     glBegin(GL_LINES);
-    glVertex2f(x, y - 0.03f); // Body's upper point
+    glVertex2f(x, y + 0.1f); // Body's upper point
     glVertex2f(x, y - 0.2f); // Body's lower point
     glEnd();
 
     // Draw arms
     glBegin(GL_LINES);
-    glVertex2f(x, y - 0.1f); // Arms' upper point
-    glVertex2f(x - 0.05f, y - 0.15f); // Left arm's lower point
+    glVertex2f(x, y - 0.05f); // Arms' upper point
+    glVertex2f(x + 0.05f, y - 0.15f); // Left arm's lower point
     glEnd();
     glBegin(GL_LINES);
-    glVertex2f(x, y - 0.1f); // Arms' upper point
-    glVertex2f(x + 0.05f, y - 0.15f); // Right arm's lower point
+    glVertex2f(x, y - 0.05f); // Arms' upper point
+    glVertex2f(x - 0.05f, y - 0.15f); // Right arm's lower point
     glEnd();
 
     // Draw legs
     glBegin(GL_LINES);
     glVertex2f(x, y - 0.2f); // Legs' upper point
-    glVertex2f(x - 0.03f, y - 0.25f); // Left leg's lower point
+    glVertex2f(x - 0.03f, y - 0.30f); // Left leg's lower point
     glEnd();
     glBegin(GL_LINES);
     glVertex2f(x, y - 0.2f); // Legs' upper point
-    glVertex2f(x + 0.03f, y - 0.25f); // Right leg's lower point
+    glVertex2f(x + 0.03f, y - 0.30f); // Right leg's lower point
     glEnd();
 }
 
 int ball_index(int player) {
-    for (int i = 0; i < num_balls; i++) {
-        if (balls[i].player_id == player)
-            return i;
-    }
+    if (!is_empty_queue(all_players[player].balls_queue))
+        return dequeue(all_players[player].balls_queue);
+    // for (int i = 0; i < MAX_PLAYERS; i++) {
+    //     if (balls[i].player_id == player)
+    //         return i;
+    // }
     return -1;
 }
 
@@ -213,15 +214,19 @@ void read_fifo() {
                 
                 strtok(msg_r, ",");
 
-                if (strcmp(msg_r, "P") == 0) { 
+                if (strcmp(msg_r, "P") == 0) {
                     char* string = strtok('\0', ",");
                     int target = atoi(string); // target position
-                    printf("target (%d): %d\n", i, target);
 
                     char* strEnergy = strtok('\0', "\n");
-                    energy_bars[i] = atof(strEnergy);
+                    energy_bars[i] = (atoi(strEnergy) / 100.0);
+                    // all_players[i].energy_bar = atof(strEnergy);
+                    printf("Energy (%d): %0.2f\n", i, energy_bars[i]);
 
                     int ball_i = ball_index(i);
+                    // printf("Child (%d): has ball_i=%d\n", i, ball_i);
+                    enqueue(all_players[target].balls_queue, ball_i);
+                    display_queue(all_players[target].balls_queue);
 
                     if (ball_i == -1)
                         continue;
@@ -230,12 +235,14 @@ void read_fifo() {
                     balls[ball_i].target_ball_position = target;
                     players_balls[target]++;
                     players_balls[i]--;
+
+
                 } else if (strcmp(msg_r, "D") == 0) {
                     // change color...
 
                 } else if (strcmp(msg_r, "E") == 0) {
                     char* str = strtok('\0', ","); // energy lvl
-                    energy_bars[i] = atof(str);
+                    energy_bars[i] = (atoi(str) / 100.0);
                 }
             }
         }
@@ -302,7 +309,7 @@ void display() {
     // energy bars
     if (energy_bars[LEAD_A] >= 0.8)
         glColor3f(0.0f, 0.7f, 0.2f);
-    else if (energy_bars[LEAD_A] < 0.4)
+    else if (energy_bars[LEAD_A] <= 0.6)
         glColor3f(1.0f, 0.05f, 0.0f);
     else
         glColor3f(1.0f, 0.647f, 0.0f);
@@ -323,7 +330,7 @@ void display() {
     // energy bars
     if (energy_bars[LEAD_B] >= 0.8)
         glColor3f(0.0f, 0.7f, 0.2f);
-    else if (energy_bars[LEAD_B] < 0.4)
+    else if (energy_bars[LEAD_B] <= 0.6)
         glColor3f(1.0f, 0.05f, 0.0f);
     else
         glColor3f(1.0f, 0.647f, 0.0f);
@@ -346,16 +353,16 @@ void display() {
 		drawRectangleLine(-0.93f + i * 0.18f, -0.3, 0.17, 0.02);
 
         // energy bars
-        if (energy_bars[i] >= 0.8)
+        if (energy_bars[i+1] >= 0.8)
             glColor3f(0.0f, 0.7f, 0.2f);
-        else if (energy_bars[i] <= 0.4)
+        else if (energy_bars[i+1] <= 0.6)
             glColor3f(1.0f, 0.05f, 0.0f);
         else
             glColor3f(1.0f, 0.647f, 0.0f);
 
-        drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f * energy_bars[i], 0.02f);
+        drawRectangle(-0.93f + i * 0.18f, -0.3, 0.17f * energy_bars[i+1], 0.02f);
 
-        sprintf(s, "E=%d", (int) (energy_bars[i] * 100));
+        sprintf(s, "E=%d", (int) (energy_bars[i+1] * 100));
         glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
 		drawText(-0.9f + i * 0.18f, -0.35, s);
     }
@@ -371,16 +378,16 @@ void display() {
 		drawRectangleLine(0.06f + i * 0.18f, -0.3, 0.17, 0.02);
         
         // energy bars
-        if (energy_bars[i+6] >= 0.8)
+        if (energy_bars[i+7] >= 0.8)
             glColor3f(0.0f, 0.7f, 0.2f);
-        else if (energy_bars[i+6] <= 0.4)
+        else if (energy_bars[i+7] <= 0.6)
             glColor3f(1.0f, 0.05f, 0.0f);
         else
             glColor3f(1.0f, 0.647f, 0.0f);
 
-        drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i+6], 0.02f);
+        drawRectangle(0.06f + i * 0.18f, -0.3, 0.17f * energy_bars[i+7], 0.02f);
 
-        sprintf(s, "E=%d", (int) (energy_bars[i+6] * 100));
+        sprintf(s, "E=%d", (int) (energy_bars[i+7] * 100));
         glColor3f(1.0f, 1.0f, 1.0f); // Set color to yellow
 		drawText(0.09f + i * 0.18f, -0.35, s);
     }
@@ -424,6 +431,22 @@ void generate_random_color(int ball_id) {
     rgb[2] = (blue / 255.0); 
 }
 
+void init_players() {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        all_players[i].balls_queue = NULL;
+
+        all_players[i].balls_queue = create_queue(all_players[i].balls_queue);
+        
+        all_players[i].dropped_ball = false;
+        all_players[i].energy_bar = 0;
+    }
+}
+
+void delete_players() {
+    for (int i = 0; i < MAX_PLAYERS; i++)
+        delete_queue(all_players[i].balls_queue);
+}
+
 
 // Main function
 int main(int argc, char** argv) {
@@ -437,6 +460,7 @@ int main(int argc, char** argv) {
     fd_pipe[1] = atoi(argv[2]);
 
     strcpy(last_winner, "No One Yet");
+    init_players();
     
     // balls with team leads
     // balls with Lead A
@@ -447,23 +471,30 @@ int main(int argc, char** argv) {
     
     generate_random_color(num_balls);
 
-    balls[num_balls].colorR = rgb[0];
-    balls[num_balls].colorG = rgb[1];
-    balls[num_balls].colorB = rgb[2];
+    // balls[num_balls].colorR = rgb[0];
+    // balls[num_balls].colorG = rgb[1];
+    // balls[num_balls].colorB = rgb[2];
+
+    balls[num_balls].colorR = 1;
+    balls[num_balls].colorG = 1;
+    balls[num_balls].colorB = 1;
     num_balls++;
     players_balls[LEAD_A] = 1;
+    enqueue(all_players[LEAD_A].balls_queue, 0);
+
     
     // balls with Lead B
     balls[num_balls].player_id = 6;
     balls[num_balls].target_ball_position = LEAD_B;
     balls[num_balls].current_ball_position[0] = ballPositions[12][0];
     balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+    enqueue(all_players[LEAD_B].balls_queue, 1);
 
     generate_random_color(num_balls);
 
-    balls[num_balls].colorR = rgb[0];
-    balls[num_balls].colorG = rgb[1];
-    balls[num_balls].colorB = rgb[2];
+    balls[num_balls].colorR = 0;
+    balls[num_balls].colorG = 1;
+    balls[num_balls].colorB = 0;
 
     num_balls++;
     players_balls[LEAD_B] = 1;
@@ -487,7 +518,6 @@ int main(int argc, char** argv) {
         exit(SIGQUIT);
     }
 
-
     glutInit(&argc, argv); // Initialize GLUT
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); // Enable double buffering, RGB colors, and depth buffer
     glutInitWindowSize(950, 950); // Set the window size
@@ -499,6 +529,9 @@ int main(int argc, char** argv) {
     glutIdleFunc(updateBallPosition); // Register the update function
 
     glutMainLoop(); // Enter the GLUT event processing loop
+    
+    delete_players();
+
     return 0;
 }
 
@@ -514,6 +547,8 @@ void send_ball_a(int sig) {
     balls[num_balls].colorR = rgb[0];
     balls[num_balls].colorG = rgb[1];
     balls[num_balls].colorB = rgb[2];
+    enqueue(all_players[LEAD_A].balls_queue, num_balls);
+    
     num_balls++;
 }
 
@@ -529,6 +564,9 @@ void send_ball_b(int sig) {
     balls[num_balls].colorR = rgb[0];
     balls[num_balls].colorG = rgb[1];
     balls[num_balls].colorB = rgb[2];
+
+    enqueue(all_players[LEAD_B].balls_queue, num_balls);
+
     num_balls++;
 }
 
@@ -546,8 +584,14 @@ void end_round(int sig) {
 
     num_balls = 2;
 
-    for (int i = 0; i < MAX_PLAYERS; i++)
+    for (int i = 0; i < MAX_PLAYERS; i++) {
         players_balls[i] = 0;
+
+        all_players[i].balls_queue->head = 0;
+        all_players[i].balls_queue->tail = 0;
+    }
+    enqueue(all_players[LEAD_A].balls_queue, 0);
+    enqueue(all_players[LEAD_B].balls_queue, 1);
 
     last_winner[BUFSIZ];
     memset(last_winner, 0x0, sizeof(last_winner));

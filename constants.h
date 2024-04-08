@@ -39,5 +39,18 @@ struct Ball {
     float current_ball_position[2]; // current position
 };
 
+struct GUIPlayer {
+    struct Queue* balls_queue; // index of ball
+    bool dropped_ball;
+    float energy_bar;
+};
+
+struct Queue {
+    int arr[20];
+    int head;
+    int tail;
+    int max_size;
+};
+
 
 #endif

@@ -71,6 +71,7 @@ void catch_ball(int sig) {
 
 void pass_ball(int next_pid) {
     kill(next_pid, SIGUSR1);
+    player.energy -= (rand() % 2) + 1;
 
     if (player.player_num == 5)
         printf("player (%d) passing ball to (0), E=%d\n", player.player_num, player.energy);
@@ -81,14 +82,13 @@ void pass_ball(int next_pid) {
 
     fflush(NULL);
     player.num_balls_player--;
-    player.energy -= (rand() % 2) + 1;
 
     char msg_s[BUFSIZ];
 
     if (player.player_num < 6)
-        sprintf(msg_s, "P,%d,%0.2f", (player.player_num + 1) % 6, (player.energy / 100.0));
+        sprintf(msg_s, "P,%d,%d", (player.player_num + 1) % 6, player.energy);
     else
-        sprintf(msg_s, "P,%d,%0.2f", ((player.player_num + 1) % 6) + 6, (player.energy / 100.0));
+        sprintf(msg_s, "P,%d,%d", ((player.player_num + 1) % 6) + 6, player.energy);
 
     write_fifo(msg_s, player.fifo_name);
 }
@@ -108,5 +108,5 @@ void decrement_energy(int sig) {
 void reset(int sig) {
     round_finished = true;
     init_vars(&player.energy, &player.num_balls_player, NULL, player.fifo_name);
-    sleep(5);
+    sleep(3);
 }

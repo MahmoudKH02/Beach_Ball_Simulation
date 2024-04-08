@@ -83,6 +83,7 @@ void catch_ball_from_teamlead(int sig) {
 
 void pass_ball(int next_pid, int other_team_lead) {
     leader.num_balls_player--;
+    leader.energy -= (rand() % 2) + 1;
     char msg_s[BUFSIZ];
 
     if (leader.pass_to_next_team[leader.num_balls_player]) {
@@ -94,7 +95,7 @@ void pass_ball(int next_pid, int other_team_lead) {
         leader.pass_to_next_team[leader.num_balls_player] = false;
         leader.num_balls_team--;
 
-        sprintf(msg_s, "P,%d,%0.2f", (leader.player_num == LEAD_A)? LEAD_B:LEAD_A, (leader.energy / 100.0));
+        sprintf(msg_s, "P,%d,%d", (leader.player_num == LEAD_A)? LEAD_B:LEAD_A, leader.energy);
 
         // ask parent to pass ball
         if (leader.num_balls_team == 0) {
@@ -102,7 +103,7 @@ void pass_ball(int next_pid, int other_team_lead) {
                 kill(getppid(), SIGUSR1);
             else
                 kill(getppid(), SIGUSR2);
-        }  
+        }
     } else {
         kill(next_pid, SIGUSR1);
 
@@ -115,13 +116,12 @@ void pass_ball(int next_pid, int other_team_lead) {
 
         fflush(NULL);
 
-        sprintf(msg_s, "P,%d,%0.2f", leader.player_num + 1, (leader.energy / 100.0));
+        sprintf(msg_s, "P,%d,%d", leader.player_num + 1, leader.energy);
     }
 
     write_fifo(msg_s, leader.fifo_name);
 
     srand(time(NULL));
-    leader.energy -= (rand() % 2) + 1;
 }
 
 
@@ -144,5 +144,5 @@ void reset(int sig) {
 
     init_vars(&leader.energy, &leader.num_balls_player, &leader.num_balls_team, leader.fifo_name);
     round_finished = true;
-    sleep(5);
+    sleep(3);
 }

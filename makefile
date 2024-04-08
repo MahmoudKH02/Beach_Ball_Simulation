@@ -7,7 +7,7 @@ files:
 	$(G) player.c functions.o $(O) player
 	$(G) teamLead.c functions.o $(O) teamLead
 	$(G) main.c functions.o $(O) main
-	$(G) drawer.c $(O) drawer -lglut -lGLU -lGL -lm
+	$(G) drawer.c functions.o $(O) drawer -lglut -lGLU -lGL -lm
 
 
 clean:

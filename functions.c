@@ -39,7 +39,7 @@ void init_vars(int* energy, int* num_balls_player, int* num_balls_team, char* fi
         *num_balls_team = 0;
     
     char msg[BUFSIZ];
-    sprintf(msg, "E,%f", (*energy / 100.0));
+    sprintf(msg, "E,%d", *energy);
     write_fifo(msg, fifo_name);
 }
 
@@ -111,4 +111,64 @@ void write_fifo(char* msg, char* fifo_name) {
         }
     }
     close(f);
+}
+
+
+/*
+**************************************************************
+---------------------| Queue Functions | ---------------------
+**************************************************************
+*/
+
+struct Queue* create_queue(struct Queue* q) {
+    if (q == NULL) {
+        q = (struct Queue*) malloc(sizeof(struct Queue));
+
+        if (q == NULL)
+            perror("Malloc Failed!!!");
+            
+        q->max_size = 20;
+        q->head = 0;
+        q->tail = 0;
+
+        return q;
+    }
+    return NULL;
+}
+
+void enqueue(struct Queue* q, int data) {
+    q->arr[q->tail] = data;
+    q->tail = (q->tail + 1) % q->max_size;
+}
+
+int dequeue(struct Queue* q) {
+    int data = q->arr[q->head];
+    q->head = (q->head + 1) % q->max_size;
+
+    return data;
+}
+
+void display_queue(struct Queue* q) {
+    if (is_empty_queue(q)) {
+        printf("Empty Queue\n");
+        fflush(NULL);
+    }
+    for (int i = 0; i < get_queue_size(q); i++) {
+        printf("%d ", q->arr[i]);
+        fflush(NULL);
+    }
+    printf("\n");
+    fflush(NULL);
+}
+
+int get_queue_size(struct Queue* q) {
+    return abs(q->tail - q->head);
+}
+
+bool is_empty_queue(struct Queue* q) {
+    return abs(q->tail - q->head) == 0;
+}
+
+void delete_queue(struct Queue* q) {
+    free(q);
 }
