@@ -31,7 +31,7 @@ struct Player_vars {
 };
 
 struct Ball {
-    int player_id;
+    int player_id; // the player that has this ball.
     float colorR;
     float colorG;
     float colorB;
@@ -52,6 +52,5 @@ struct Queue {
     int tail;
     int max_size;
 };
-
 
 #endif

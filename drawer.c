@@ -1,11 +1,5 @@
+
 #include "headers.h"
-
-void send_ball_a(int sig);
-void send_ball_b(int sig);
-void end_round(int sig);
-void end_game(int sig);
-
-void generate_random_color(int);
 
 char fifos[MAX_PLAYERS][100] = {
     "/tmp/fifoA0",
@@ -535,108 +529,7 @@ void delete_players() {
 }
 
 
-// Main function
-int main(int argc, char** argv) {
-
-    if (argc < 4) {
-        perror("Not enough args");
-        exit(SIGQUIT);
-    }
-
-    fd_pipe[0] = atoi(argv[1]);
-    fd_pipe[1] = atoi(argv[2]);
-    round_duration = atoi(argv[3]);
-    seconds_remaining = round_duration;
-
-
-    strcpy(last_winner, "No One Yet");
-    init_players();
-    
-    // balls with team leads
-    // balls with Lead A
-    balls[num_balls].player_id = 0;
-    balls[num_balls].target_ball_position = LEAD_A;
-    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
-    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
-    
-    generate_random_color(num_balls);
-
-    balls[num_balls].colorR = rgb[0];
-    balls[num_balls].colorG = rgb[1];
-    balls[num_balls].colorB = rgb[2];
-
-    // balls[num_balls].colorR = 1;
-    // balls[num_balls].colorG = 1;
-    // balls[num_balls].colorB = 1;
-    num_balls++;
-    all_players[LEAD_A].num_balls = 1;
-    enqueue(all_players[LEAD_A].balls_queue, 0);
-
-    
-    // balls with Lead B
-    balls[num_balls].player_id = 6;
-    balls[num_balls].target_ball_position = LEAD_B;
-    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
-    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
-    enqueue(all_players[LEAD_B].balls_queue, 1);
-
-    generate_random_color(num_balls);
-
-    balls[num_balls].colorR = rgb[0];
-    balls[num_balls].colorG = rgb[1];
-    balls[num_balls].colorB = rgb[2];
-
-    // balls[num_balls].colorR = 0;
-    // balls[num_balls].colorG = 1;
-    // balls[num_balls].colorB = 0;
-
-    num_balls++;
-    all_players[LEAD_B].num_balls = 1;
-
-    sleep(1);
-    read_fifo();
-
-    // set signals
-    if ( signal(SIGUSR1, send_ball_a) == SIG_ERR ) {
-        perror("Signale error Drawer");
-        exit(SIGQUIT);
-    }
-
-    if ( signal(SIGUSR2, send_ball_b) == SIG_ERR ) {
-        perror("Signale error Drawer");
-        exit(SIGQUIT);
-    }
-
-    if ( signal(SIGRTMIN, end_round) == SIG_ERR ) {
-        perror("Signale error Drawer");
-        exit(SIGQUIT);
-    }
-
-    if ( signal(SIGINT, end_game) == SIG_ERR ) {
-        perror("Signale error Drawer");
-        exit(SIGQUIT);
-    }
-
-    glutInit(&argc, argv); // Initialize GLUT
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); // Enable double buffering, RGB colors, and depth buffer
-    glutInitWindowSize(950, 950); // Set the window size
-    glutCreateWindow("Beach Ball Game Simulation"); // Create the window with a title
-
-    initialize(); // Call initialization routine
-
-    glutDisplayFunc(display); // Register the display function
-    glutIdleFunc(updateBallPosition); // Register the update function
-
-    // Start the countdown timer
-    glutTimerFunc(0, updateTimer, 0);
-
-    glutMainLoop(); // Enter the GLUT event processing loop
-    
-    delete_players();
-
-    return 0;
-}
-
+// ----------- signal handlers -----------
 // recieve signal
 void send_ball_a(int sig) {
     balls[num_balls].player_id = LEAD_A;
@@ -698,6 +591,9 @@ void end_round(int sig) {
     enqueue(all_players[LEAD_A].balls_queue, 0);
     enqueue(all_players[LEAD_B].balls_queue, 1);
 
+    all_players[LEAD_A].num_balls = 1;
+    all_players[LEAD_B].num_balls = 1;
+
     last_winner[BUFSIZ];
     memset(last_winner, 0x0, sizeof(last_winner));
 
@@ -709,12 +605,110 @@ void end_round(int sig) {
         wins_b++;
 
     seconds_remaining = round_duration;
-    // glutPostRedisplay();
 }
 
 void end_game(int sig) {
     delete_players();
     printf("Sigint recieved\n");
     fflush(NULL);
+
+    if (all_players[LEAD_A].num_balls < all_players[LEAD_B].num_balls)
+        wins_a++;
+    else if (all_players[LEAD_A].num_balls > all_players[LEAD_B].num_balls)
+        wins_b++;
+
     game_ended = true;
+}
+
+
+// Main function
+int main(int argc, char** argv) {
+
+    if (argc < 4) {
+        perror("Not enough args");
+        exit(SIGQUIT);
+    }
+
+    fd_pipe[0] = atoi(argv[1]);
+    fd_pipe[1] = atoi(argv[2]);
+    round_duration = atoi(argv[3]);
+    seconds_remaining = round_duration;
+
+    strcpy(last_winner, "No One Yet");
+    init_players();
+    
+    // balls with team leads
+    // balls with Lead A
+    balls[num_balls].player_id = 0;
+    balls[num_balls].target_ball_position = LEAD_A;
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+    
+    // set color for the first ball
+    balls[num_balls].colorR = 0;
+    balls[num_balls].colorG = 0.6;
+    balls[num_balls].colorB = 0.29;
+
+    num_balls++;
+    all_players[LEAD_A].num_balls = 1;
+    enqueue(all_players[LEAD_A].balls_queue, 0);
+
+    
+    // balls with Lead B
+    balls[num_balls].player_id = 6;
+    balls[num_balls].target_ball_position = LEAD_B;
+    balls[num_balls].current_ball_position[0] = ballPositions[12][0];
+    balls[num_balls].current_ball_position[1] = ballPositions[12][1];
+    enqueue(all_players[LEAD_B].balls_queue, 1);
+
+    // set color for the second ball
+    balls[num_balls].colorR = 0.8;
+    balls[num_balls].colorG = 0.6;
+    balls[num_balls].colorB = 0;
+
+    num_balls++;
+    all_players[LEAD_B].num_balls = 1;
+
+    sleep(1);
+    read_fifo();
+
+    // set signals
+    if ( signal(SIGUSR1, send_ball_a) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    if ( signal(SIGUSR2, send_ball_b) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    if ( signal(SIGRTMIN, end_round) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    if ( signal(SIGINT, end_game) == SIG_ERR ) {
+        perror("Signale error Drawer");
+        exit(SIGQUIT);
+    }
+
+    glutInit(&argc, argv); // Initialize GLUT
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); // Enable double buffering, RGB colors, and depth buffer
+    glutInitWindowSize(950, 950); // Set the window size
+    glutCreateWindow("Beach Ball Game Simulation"); // Create the window with a title
+
+    initialize(); // Call initialization routine
+
+    glutDisplayFunc(display); // Register the display function
+    glutIdleFunc(updateBallPosition); // Register the update function
+
+    // Start the countdown timer
+    glutTimerFunc(0, updateTimer, 0);
+
+    glutMainLoop(); // Enter the GLUT event processing loop
+    
+    delete_players();
+
+    return 0;
 }

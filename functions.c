@@ -1,6 +1,6 @@
 #include "headers.h"
 
-
+// read the pids for the parent, through the pipe.
 pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead) {
     char message[BUFSIZ];
 
@@ -19,6 +19,8 @@ pid_t fetch_next_pid(int r_fd_pipe, int* other_team_lead) {
     return atoi(message);
 }
 
+
+// set the signals with the signal handlers
 void set_signals(int signals[], void (*functionArray[])(int), int num_of_signals) {
     for (int i = 0; i < num_of_signals; i++) {
         if ( (signal(signals[i], functionArray[i])) == SIG_ERR ) {
@@ -28,6 +30,9 @@ void set_signals(int signals[], void (*functionArray[])(int), int num_of_signals
     }
 }
 
+
+// initialize the energy randomly (seed is a combination of time and pid, this will make each player have differnt level of energy)
+// write the new values to the drawer (openGL), through the fifo.
 void init_vars(int* energy, int* num_balls_player, int* num_balls_team, char* fifo_name) {
     // initialize energy
     srand(time(NULL) + getpid());
@@ -43,7 +48,7 @@ void init_vars(int* energy, int* num_balls_player, int* num_balls_team, char* fi
     write_fifo(msg, fifo_name);
 }
 
-// short pause
+// calculate the short pause (each level range has different sleep ranges).
 unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fifo_name) {
     srand(time(NULL));
 
@@ -63,7 +68,7 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fif
     // calculate drop probability
     int drop_proba;
 
-    // get the drop probability
+    // check if the ball is dropped
     if (balls <= 3)
         drop_proba = (int) 100 - (energy / balls);
     else    
@@ -98,6 +103,8 @@ unsigned int get_sleep_duration(int energy, int balls, int player_num, char* fif
     return duration;
 }
 
+
+// write a message through the fifo, to the drawer (openGL).
 void write_fifo(char* msg, char* fifo_name) {
     int f = open(fifo_name, O_RDONLY | O_NONBLOCK);
 
@@ -120,6 +127,7 @@ void write_fifo(char* msg, char* fifo_name) {
 **************************************************************
 */
 
+// create a new queue
 struct Queue* create_queue(struct Queue* q) {
     if (q == NULL) {
         q = (struct Queue*) malloc(sizeof(struct Queue));
@@ -146,31 +154,22 @@ int dequeue(struct Queue* q) {
     return data;
 }
 
-void display_queue(struct Queue* q) {
-    if (is_empty_queue(q)) {
-        printf("Empty Queue\n");
-        fflush(NULL);
-    }
-    for (int i = 0; i < get_queue_size(q); i++) {
-        printf("%d ", q->arr[i]);
-        fflush(NULL);
-    }
-    printf("\n");
-    fflush(NULL);
-}
 
 int get_queue_size(struct Queue* q) {
     return abs(q->tail - q->head);
 }
 
+
 bool is_empty_queue(struct Queue* q) {
     return abs(q->tail - q->head) == 0;
 }
+
 
 void clear_queue(struct Queue* q) {
     q->head = 0;
     q->tail = 0;
 }
+
 
 void delete_queue(struct Queue* q) {
     free(q);
