@@ -12,6 +12,9 @@ int drawer_pipe[2];
 int current_round = 0;
 bool round_finished = false;
 
+static int MAX_ROUNDS;
+static int ROUND_TIME;
+
 
 int main(int argc, char *argv[]) {
 	int i;
@@ -19,9 +22,12 @@ int main(int argc, char *argv[]) {
     char* fifos[MAX_PLAYERS];
 
     // read game settings
-    readFile(argv[1]);
+    if (argc < 2) {
+        readFile(DEFAULT_SETTINGS);
+    } else {
+        readFile(argv[1]);
+    }
     printf("value: %d, %d\n", MAX_ROUNDS, ROUND_TIME);
-
 
     // create the fifo pipes
     for (i = 0; i < MAX_PLAYERS; i++) {

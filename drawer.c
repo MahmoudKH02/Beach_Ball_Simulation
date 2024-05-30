@@ -594,7 +594,6 @@ void end_round(int sig) {
     all_players[LEAD_A].num_balls = 1;
     all_players[LEAD_B].num_balls = 1;
 
-    last_winner[BUFSIZ];
     memset(last_winner, 0x0, sizeof(last_winner));
 
     read(fd_pipe[0], last_winner, sizeof(last_winner));

@@ -2,6 +2,7 @@
 #define __CONSTANTS__
 
 #define FIFO_PATH "/tmp/fifo"
+#define DEFAULT_SETTINGS "settings.txt"
 
 #define MAX_PLAYERS 12
 #define MAX_BALLS 30
@@ -10,8 +11,6 @@
 #define LAST_A 5
 #define LAST_B 11
 
-static int MAX_ROUNDS;
-static int ROUND_TIME;
 
 struct Teamlead_var {
     int energy;
